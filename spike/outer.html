@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>M0 spike — sandbox matrix</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 12px; }
+  .case { margin-bottom: 8px; }
+  iframe { width: 420px; height: 300px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+<div id="cases"></div>
+<script>
+// The §7.1 question: VSCode's webview is itself a sandboxed iframe and a child blob: frame
+// inherits that sandbox. Test the configs that matter instead of assuming.
+const CASES = [
+    { id: 'no-sandbox',   sandbox: null,                            note: 'baseline, no outer sandbox' },
+    { id: 'vscode-like',  sandbox: 'allow-scripts allow-same-origin', note: "what VSCode actually sets" },
+    { id: 'no-same-origin', sandbox: 'allow-scripts',                note: 'the feared case' },
+]
+
+const results = {}
+window.__SPIKE_RESULTS__ = results
+window.__SPIKE_DONE__ = false
+
+let epubBytes = null
+const pending = new Map()
+
+addEventListener('message', ev => {
+    const d = ev.data
+    if (!d || !d.__spike && d.type !== 'ready') return
+    // Identify which frame spoke.
+    const entry = [...pending.entries()].find(([, w]) => w === ev.source)
+    if (!entry) return
+    const [id] = entry
+    if (d.type === 'ready') { sendBook(id); return }
+    results[id] = d
+    if (Object.keys(results).length === CASES.length) window.__SPIKE_DONE__ = true
+})
+
+function sendBook(id) {
+    const w = pending.get(id)
+    if (w && epubBytes) w.postMessage({ type: 'book', bytes: epubBytes }, '*')
+}
+
+// ?epub=exported.epub points the harness at our own pipeline output.
+const EPUB = new URLSearchParams(location.search).get('epub') || 'fixture.epub'
+
+async function run() {
+    const res = await fetch('./' + EPUB)
+    if (!res.ok) throw new Error(`cannot load ${EPUB}: ${res.status}`)
+    epubBytes = await res.arrayBuffer()
+    for (const c of CASES) {
+        const wrap = document.createElement('div')
+        wrap.className = 'case'
+        wrap.innerHTML = `<div><b>${c.id}</b> — sandbox="${c.sandbox ?? '(none)'}" — ${c.note}</div>`
+        const f = document.createElement('iframe')
+        if (c.sandbox) f.setAttribute('sandbox', c.sandbox)
+        f.src = './reader.html'
+        wrap.appendChild(f)
+        document.getElementById('cases').appendChild(wrap)
+        pending.set(c.id, f.contentWindow)
+        f.addEventListener('load', () => { pending.set(c.id, f.contentWindow) })
+    }
+    // A frame that never reports (blocked outright) must not hang the run.
+    setTimeout(() => {
+        for (const c of CASES) if (!results[c.id]) results[c.id] = { ok: false, stage: 'timeout', error: 'no report within 20s' }
+        window.__SPIKE_DONE__ = true
+    }, 20000)
+}
+run()
+</script>
+</body>
+</html>

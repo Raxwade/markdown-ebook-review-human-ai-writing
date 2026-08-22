@@ -1,0 +1,22 @@
+# Only dist/ + media/ ship. src/ is bundled into dist/extension.js.
+.vscode/**
+.github/**
+.claude/**
+node_modules/**
+**/node_modules/**
+out/**
+src/**
+test/**
+spike/**
+docs/**
+.playwright-mcp/**
+**/*.ts
+**/*.map
+tsconfig.json
+.nvmrc
+.gitignore
+CLAUDE.md
+# Scratch images. Screenshots dropped in the repo root have shipped in a
+# .vsix twice now; an icon, if one is ever added, must be un-ignored here.
+*.png
+*.jpg

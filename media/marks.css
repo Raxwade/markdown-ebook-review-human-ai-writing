@@ -1,0 +1,30 @@
+/* The highlight palette — loaded by *both* documents, which is the whole reason
+   it is a file of its own.
+
+   Custom properties inherit down a document. They do not cross into another one.
+   The overlayer's parent is created with `document.createElement` in
+   paginator.js's module realm (paginator.js:202), and since the refactor that
+   realm is the device frame's, not the webview's. So a --mark-* declared only in
+   reader.css reaches the swatches and the note-list dots and nothing else: the
+   drawn highlight resolved `fill: var(--mark-yellow)` against a document that
+   had never heard of it and painted black, at the .3 fallback opacity, for every
+   colour. Nothing threw — the SVG was there, the attribute read back correctly,
+   and the spike's overlayer-child count was as expected.
+
+   reader.css @imports this; media/stage.js's srcdoc links it. Adding a colour
+   means adding it here and in COLORS (src/notes.ts, media/reader.js).
+
+   The opacity override is not cosmetic: foliate's overlayer sets
+   `opacity: var(--overlayer-highlight-opacity, .3)` on the highlight group
+   itself (overlayer.js:184) — it cannot be passed in as an option — and against
+   colours that already carry their own alpha, .3 lands around 0.15, a highlight
+   you have to hunt for. The alpha belongs in the colours, so the multiplier
+   goes to 1. */
+:root {
+  --overlayer-highlight-opacity: 1;
+  --mark-yellow: rgba(255, 214, 61, 0.5);
+  --mark-green:  rgba(120, 222, 132, 0.45);
+  --mark-blue:   rgba(120, 190, 255, 0.45);
+  --mark-pink:   rgba(255, 146, 190, 0.45);
+  --mark-purple: rgba(198, 156, 255, 0.45);
+}

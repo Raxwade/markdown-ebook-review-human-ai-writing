@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible problem using non-private sample content.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include private manuscripts, credentials, or vulnerability details. Report security issues through the Security page.
+  - type: input
+    id: version
+    attributes:
+      label: Extension version
+      placeholder: 0.6.1
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: VS Code version, operating system, and local or remote/WSL usage.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include synthetic Markdown and exact steps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

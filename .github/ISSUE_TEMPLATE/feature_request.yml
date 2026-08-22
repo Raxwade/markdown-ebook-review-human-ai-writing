@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a focused improvement to the extension.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What reader, author, or contributor problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the outcome, including alternatives you considered.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Additional context
+      description: Add synthetic examples or mockups only; do not include private manuscripts.

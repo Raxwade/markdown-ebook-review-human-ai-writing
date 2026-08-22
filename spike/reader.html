@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<!-- VSCode-grade CSP. 'self' stands in for webview.cspSource.
+     frame-src/child-src blob: is what foliate-js's paginator needs (spec §7.1). -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'nonce-SPIKE_NONCE' 'self';
+  style-src 'unsafe-inline' 'self' blob:;
+  img-src blob: data: 'self';
+  font-src 'self';
+  frame-src blob: data:;
+  child-src blob:;
+  worker-src blob:;
+  connect-src blob: 'self';
+">
+<title>M0 spike</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
+  /* foliate-view has no :host styles of its own and its internals lay out taller
+     than the host, so the device frame MUST clip. Without overflow:hidden the
+     panel grows a scrollbar and stops being a fixed-size viewport. */
+  #frame { width: 390px; height: 844px; margin: 0 auto; overflow: hidden; }
+  foliate-view { display: block; width: 100%; height: 100%; overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="frame"><foliate-view id="view"></foliate-view></div>
+
+<script type="module" nonce="SPIKE_NONCE">
+import { makeBook } from './vendor/foliate-js/view.js'
+import './vendor/foliate-js/view.js'
+
+const report = payload => parent.postMessage({ __spike: true, ...payload }, '*')
+const now = () => performance.now()
+
+// Errors anywhere (including inside foliate-js) must surface as a failure, not a hang.
+addEventListener('error', e => report({ ok: false, stage: 'window.error', error: String(e.message) }))
+addEventListener('unhandledrejection', e => report({ ok: false, stage: 'unhandledrejection', error: String(e.reason) }))
+
+const openBook = async bytes => {
+    const file = new File([bytes], 'fixture.epub', { type: 'application/epub+zip' })
+    const t0 = now()
+    const book = await makeBook(file)
+    const tMake = now() - t0
+
+    const view = document.getElementById('view')
+    const t1 = now()
+    await view.open(book)
+    const tOpen = now() - t1
+    return { view, tMake, tOpen }
+}
+
+const paint = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+addEventListener('message', async ev => {
+    if (ev.data?.type !== 'book') return
+    const bytes = ev.data.bytes
+    try {
+        // --- first open: does it render at all under this CSP + sandbox? ---
+        const { view, tMake, tOpen } = await openBook(bytes)
+        const t2 = now()
+        await view.init({ lastLocation: null })
+        const tInit = now() - t2
+        await paint()
+
+        // foliate-js attaches all its shadow roots with mode:'closed', so the rendered
+        // iframe is unreachable from script. Rendering is proven by screenshot instead;
+        // what we can assert here is that the renderer exists and reports a layout.
+        const rendered = {
+            rendererTag: view.renderer?.tagName ?? null,
+            size: view.renderer ? [view.renderer.clientWidth, view.renderer.clientHeight] : null,
+        }
+
+        // --- pagination: turn pages and confirm the position actually advances ---
+        const before = view.lastLocation?.cfi ?? null
+        let turns = 0
+        for (let i = 0; i < 5; i++) { await view.next(); await paint(); turns++ }
+        const afterTurns = view.lastLocation?.cfi ?? null
+        const paginates = Boolean(before && afterTurns && before !== afterTurns)
+
+        // --- go deep, then simulate the §4.2 edit cycle: reopen + restore CFI ---
+        await view.goTo(40)
+        await paint()
+        const deepCfi = view.lastLocation?.cfi ?? null
+
+        const t3 = now()
+        const second = await openBook(bytes)
+        await second.view.init({ lastLocation: deepCfi })
+        await paint()
+        const tRebuildCycle = now() - t3
+        const restoredCfi = second.view.lastLocation?.cfi ?? null
+
+        report({
+            ok: true,
+            rendered,
+            paginates,
+            turns,
+            cfi: { deep: deepCfi, restored: restoredCfi, matches: deepCfi === restoredCfi },
+            timing: {
+                makeBook: +tMake.toFixed(1),
+                open: +tOpen.toFixed(1),
+                init: +tInit.toFixed(1),
+                reopenAndRestore: +tRebuildCycle.toFixed(1),
+            },
+        })
+    } catch (err) {
+        report({ ok: false, stage: 'run', error: String(err?.stack ?? err) })
+    }
+})
+
+report({ type: 'ready' })
+</script>
+</body>
+</html>

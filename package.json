@@ -1,0 +1,190 @@
+{
+  "name": "md-epub-preview",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "0.6.1",
+  "publisher": "raxwade",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raxwade/md-epub-preview.git"
+  },
+  "homepage": "https://github.com/Raxwade/md-epub-preview#readme",
+  "bugs": {
+    "url": "https://github.com/Raxwade/md-epub-preview/issues"
+  },
+  "keywords": [
+    "epub",
+    "markdown",
+    "preview",
+    "ebook",
+    "reader"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "mdepub.export",
+        "title": "%command.export.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "mdepub.preview",
+        "title": "%command.preview.title%",
+        "category": "%command.category%",
+        "icon": "$(book)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "mdepub.preview",
+          "when": "editorLangId == markdown",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "mdepub.splitLevel": {
+          "type": "number",
+          "enum": [
+            1,
+            2
+          ],
+          "default": 2,
+          "description": "%configuration.splitLevel.description%"
+        },
+        "mdepub.device": {
+          "type": "string",
+          "enum": [
+            "iphone-se",
+            "iphone",
+            "iphone-max",
+            "pixel",
+            "galaxy",
+            "ipad-mini",
+            "ipad",
+            "ipad-pro-11",
+            "ipad-pro-13",
+            "kindle",
+            "kindle-oasis",
+            "kobo-clara",
+            "remarkable",
+            "desktop",
+            "desktop-wide",
+            "panel",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "%configuration.device.iphoneSe%",
+            "%configuration.device.iphone%",
+            "%configuration.device.iphoneMax%",
+            "%configuration.device.pixel%",
+            "%configuration.device.galaxy%",
+            "%configuration.device.ipadMini%",
+            "%configuration.device.ipad%",
+            "%configuration.device.ipadPro11%",
+            "%configuration.device.ipadPro13%",
+            "%configuration.device.kindle%",
+            "%configuration.device.kindleOasis%",
+            "%configuration.device.koboClara%",
+            "%configuration.device.remarkable%",
+            "%configuration.device.desktop%",
+            "%configuration.device.desktopWide%",
+            "%configuration.device.panel%",
+            "%configuration.device.custom%"
+          ],
+          "default": "iphone",
+          "description": "%configuration.device.description%"
+        },
+        "mdepub.customWidth": {
+          "type": "number",
+          "default": 393,
+          "minimum": 200,
+          "description": "%configuration.customWidth.description%"
+        },
+        "mdepub.customHeight": {
+          "type": "number",
+          "default": 852,
+          "minimum": 200,
+          "description": "%configuration.customHeight.description%"
+        },
+        "mdepub.css": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "%configuration.css.description%"
+        },
+        "mdepub.lang": {
+          "type": "string",
+          "default": "",
+          "description": "%configuration.lang.description%"
+        },
+        "mdepub.author": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "%configuration.author.description%"
+        },
+        "mdepub.cover": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "%configuration.cover.description%"
+        },
+        "mdepub.debounce": {
+          "type": "number",
+          "default": 120,
+          "minimum": 0,
+          "description": "%configuration.debounce.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle",
+    "compile": "tsc -p .",
+    "bundle:stage": "esbuild media/stage.js --bundle --format=iife --outfile=media/stage.bundle.js --external:./comic-book.js --external:./fb2.js --external:./mobi.js --external:./tts.js --alias:construct-style-sheets-polyfill=./node_modules/construct-style-sheets-polyfill/dist/adoptedStyleSheets.js",
+    "bundle": "npm run bundle:stage && esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node20",
+    "test": "tsc -p . && node --test out/test/",
+    "spike:fixture": "node spike/make-fixture-epub.mjs",
+    "spike:rebuild": "node spike/rebuild-loop.mjs",
+    "spike:notes": "node spike/notes-loop.mjs",
+    "spike:reader": "node spike/reader-experience-loop.mjs",
+    "spike": "npm run spike:fixture && npm run bundle:stage && node spike/server.mjs",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "js-yaml": "^5.2.2",
+    "markdown-it": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/vscode": "~1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "construct-style-sheets-polyfill": "^3.1.0",
+    "esbuild": "^0.28.1",
+    "fast-xml-parser": "^5.10.1",
+    "foliate-js": "^1.0.1",
+    "typescript": "^7.0.2"
+  }
+}

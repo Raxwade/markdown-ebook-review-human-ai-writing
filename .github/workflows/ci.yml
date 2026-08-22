@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - name: Verify packaged extension contents
+        shell: bash
+        run: |
+          package_file=$(find . -maxdepth 1 -name '*.vsix' -print -quit)
+          test -n "$package_file"
+          unzip -l "$package_file" > /tmp/vsix-files.txt
+          grep -q 'extension/dist/extension.js' /tmp/vsix-files.txt
+          grep -q 'extension/media/reader.html' /tmp/vsix-files.txt
+          grep -q 'extension/THIRD_PARTY_NOTICES.md' /tmp/vsix-files.txt
+          if grep -Eq 'extension/(test|spike|docs|\.claude|\.playwright-mcp)/' /tmp/vsix-files.txt; then
+            echo 'Scratch or development files were packaged unexpectedly'
+            exit 1
+          fi
