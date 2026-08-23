@@ -39,7 +39,7 @@ const opf = `<?xml version="1.0" encoding="utf-8"?>
     <dc:identifier id="pub-id">urn:uuid:00000000-0000-4000-8000-000000000000</dc:identifier>
     <dc:title>M0 分頁測試稿</dc:title>
     <dc:language>zh-TW</dc:language>
-    <dc:creator>md-epub-preview spike</dc:creator>
+    <dc:creator>Markdown Ebook Review spike</dc:creator>
     <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
   </metadata>
   <manifest>

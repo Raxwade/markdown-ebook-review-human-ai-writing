@@ -1,7 +1,11 @@
-# md-epub-preview 架構規劃
+# Markdown Ebook Review — Human–AI Writing 架構規劃
 
 VSCode 擴充套件：任何 Markdown 檔 → EPUB → 右側面板即時預覽，改動一秒內反映。
 不綁任何專案的建置腳本，不依賴 pandoc 或 calibre。
+
+作者可以直接在電子書版面中搜尋、標記與留下修訂註記。註記會存成結構化 JSON sidecar，作為人類作者交給 AI 進行下一輪修訂的明確依據。
+
+套件識別碼是 `markdown-ebook-review-human-ai-writing`，完整 VS Code 擴充套件 ID 是 `raxwade.markdown-ebook-review-human-ai-writing`。設定與命令繼續使用較短的 `mdepub.*`，讓工作區設定與自動化流程保持穩定。
 
 ---
 
@@ -347,7 +351,7 @@ esbuild 打包 → `@vscode/vsce package` → `.vsix` → `code --install-extens
 | **M0** ✅ | spike：CSP/iframe 能不能跑、CFI 還原計時 | 過了，見 7.1／7.2。`npm run spike` 可重跑 |
 | **M1** ✅ | build 管線 + 單元測試 + `Export EPUB` 命令 | 65 個測試過；自產的 EPUB 用 M0 的 harness（foliate-js＝Foliate 桌面版同一顆引擎）載入、渲染、翻頁、CFI 還原都正常。兩份外部參考稿未納入 repo，因此尚未在此環境實測 |
 | **M2** ⚠️ | 預覽面板 + live reload + 裝置框 | 程式寫完，webview 那半用 harness（載真正的 `media/reader.html`）驗過：切裝置、轉向、換書位置都不跳，分頁確實隨框改變（見 6.1 的表）。**還沒在真的 VSCode 裡跑過**，`preview.ts` 那半留到 M3 的 Remote-WSL 安裝一起驗 |
-| **M3** ⚠️ | 設定、錯誤處理、README、打包安裝 | 設定、錯誤處理、README、`.vsix` 都好了，也在 Remote-WSL 裝起來了（`raxwade.md-epub-preview@0.1.0`）。extension host 那半用 stub 過的 `vscode` 模組測了命令註冊、匯出、面板 HTML、資源路徑白名單。**但沒有人真的在編輯器裡開過面板**——那要手動點一次才算數 |
+| **M3** ⚠️ | 設定、錯誤處理、README、打包安裝 | 設定、錯誤處理、README、`.vsix` 都好了，也在 Remote-WSL 裝起來了（`raxwade.markdown-ebook-review-human-ai-writing@0.1.0`）。extension host 那半用 stub 過的 `vscode` 模組測了命令註冊、匯出、面板 HTML、資源路徑白名單。**但沒有人真的在編輯器裡開過面板**——那要手動點一次才算數 |
 
 M1 結束就已經是可用的工具（通用 md→epub 匯出），M2 才是完整目標。
 

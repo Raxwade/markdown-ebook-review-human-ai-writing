@@ -12,6 +12,9 @@ Notable project changes are recorded here. The format follows
 
 ### Changed
 
+- Rename the extension and package identity to **Markdown Ebook Review —
+  Human–AI Writing** (`raxwade.markdown-ebook-review-human-ai-writing`) and
+  describe its structured-note handoff for AI-assisted revision.
 - Replace private manuscript references with synthetic fixtures.
 - Add community health files, CI, dependency automation, release guidance, and
   third-party license notices.
@@ -35,7 +38,7 @@ Notable project changes are recorded here. The format follows
 
 - Note anchoring and navigation across Markdown syntax, tables, and chapter loads.
 
-[Unreleased]: https://github.com/Raxwade/md-epub-preview/compare/v0.6.1...HEAD
-[0.6.1]: https://github.com/Raxwade/md-epub-preview/releases/tag/v0.6.1
-[0.6.0]: https://github.com/Raxwade/md-epub-preview/releases/tag/v0.6.0
-[0.5.1]: https://github.com/Raxwade/md-epub-preview/releases/tag/v0.5.1
+[Unreleased]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.6.1
+[0.6.0]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.6.0
+[0.5.1]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.5.1

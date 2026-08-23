@@ -1,8 +1,8 @@
 # Third-party notices
 
-Markdown EPUB Preview includes the following vendored or bundled components.
-Their licenses apply to those components; the rest of this project remains
-licensed under the root `LICENSE` file.
+Markdown Ebook Review — Human–AI Writing includes the following vendored or
+bundled components. Their licenses apply to those components; the rest of this
+project remains licensed under the root `LICENSE` file.
 
 ## foliate-js 1.0.1
 

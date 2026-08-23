@@ -1,5 +1,5 @@
 {
-  "name": "md-epub-preview",
+  "name": "markdown-ebook-review-human-ai-writing",
   "displayName": "%displayName%",
   "description": "%description%",
   "version": "0.6.1",
@@ -7,18 +7,21 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Raxwade/md-epub-preview.git"
+    "url": "git+https://github.com/Raxwade/markdown-ebook-review-human-ai-writing.git"
   },
-  "homepage": "https://github.com/Raxwade/md-epub-preview#readme",
+  "homepage": "https://github.com/Raxwade/markdown-ebook-review-human-ai-writing#readme",
   "bugs": {
-    "url": "https://github.com/Raxwade/md-epub-preview/issues"
+    "url": "https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/issues"
   },
   "keywords": [
     "epub",
     "markdown",
     "preview",
     "ebook",
-    "reader"
+    "reader",
+    "annotation",
+    "writing",
+    "ai-assisted"
   ],
   "engines": {
     "vscode": "^1.85.0"

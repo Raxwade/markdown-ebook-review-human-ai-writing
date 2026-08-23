@@ -292,7 +292,7 @@ async function exportEpub(): Promise<void> {
         )
             .then(pick => {
                 if (pick !== details) return
-                const channel = vscode.window.createOutputChannel('Markdown EPUB')
+                const channel = vscode.window.createOutputChannel('Markdown Ebook Review')
                 channel.appendLine(summary)
                 for (const w of result.warnings) channel.appendLine(`  · ${w}`)
                 channel.show()

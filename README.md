@@ -1,10 +1,25 @@
-# Markdown EPUB Preview
+# Markdown Ebook Review — Human–AI Writing
 
-[![CI](https://github.com/Raxwade/md-epub-preview/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxwade/md-epub-preview/actions/workflows/ci.yml)
+[![CI](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml)
 
-Preview any Markdown file as a real EPUB in a VS Code side panel. The extension uses a pure JavaScript pipeline and requires neither pandoc nor calibre.
+Preview your Markdown manuscript as an ebook, leave structured notes, and guide the next AI revision.
 
-The preview is rendered by [foliate-js](https://github.com/johnfactotum/foliate-js), the same engine used by the Foliate desktop reader. It therefore shows actual pagination, chapter boundaries, image breaks, and layout behavior instead of approximating an ebook with a scrolling HTML page.
+Markdown Ebook Review — Human–AI Writing is a VS Code extension for authors who write books in Markdown, especially authors who draft and revise with AI. It renders the active manuscript as a real EPUB in a panel beside the source. Every edit rebuilds the in-memory preview automatically, so you can inspect the book's pagination, chapter boundaries, image breaks, and reading experience without manually exporting and reopening an EPUB after every change.
+
+While reviewing, you can search the whole book, save bookmarks, highlight passages, and attach revision notes. Highlights and notes are written to a JSON sidecar—a separate review file next to the manuscript. You can give that file to an AI assistant as a precise, source-linked revision brief, then see the revised Markdown re-rendered immediately in the preview.
+
+The preview is powered by [foliate-js](https://github.com/johnfactotum/foliate-js), the same engine used by the Foliate desktop reader, rather than a scrolling HTML approximation. The conversion pipeline is pure JavaScript and requires neither pandoc nor calibre.
+
+## Author and AI workflow
+
+1. Draft or revise the book with an AI assistant while keeping Markdown as the source of truth.
+2. Open the live EPUB preview beside the Markdown editor.
+3. Read in a representative phone, tablet, e-reader, or desktop layout. Search the manuscript and add bookmarks as you review.
+4. Highlight passages and record revision instructions in context.
+5. Give the manuscript and its `<book>.md.notes.json` sidecar to your AI assistant for the next revision pass.
+6. Review the changes immediately in the live preview, and export an `.epub` only when you need a distributable file.
+
+The extension does not send your manuscript to an AI provider or revise it automatically. The JSON sidecar is a portable handoff format that you can use with the model and workflow of your choice.
 
 ## Features
 
@@ -33,7 +48,7 @@ The extension is currently distributed as a local VSIX.
 ```bash
 npm install
 npm run package
-code --install-extension md-epub-preview-*.vsix --force
+code --install-extension markdown-ebook-review-human-ai-writing-*.vsix --force
 ```
 
 Reload VS Code after installation: open the Command Palette and run `Developer: Reload Window`.
@@ -54,7 +69,7 @@ Verify the installed version with:
 
 ```bash
 code --list-extensions --show-versions | rg epub
-# raxwade.md-epub-preview@0.6.1
+# raxwade.markdown-ebook-review-human-ai-writing@0.6.1
 ```
 
 Rebuild before reinstalling after a code change. `--force` permits overwriting an installed version; it does not rebuild the VSIX.
@@ -63,10 +78,10 @@ Rebuild before reinstalling after a code change. `--force` permits overwriting a
 
 | Command | Action |
 |---|---|
-| `Markdown EPUB: Open EPUB Preview` | Open the live preview beside the editor. The book icon in the editor title runs the same command. |
-| `Markdown EPUB: Export EPUB` | Write an EPUB beside the active Markdown file. |
+| `Markdown Ebook Review: Open EPUB Preview` | Open the live preview beside the editor. The book icon in the editor title runs the same command. |
+| `Markdown Ebook Review: Export EPUB` | Write an EPUB beside the active Markdown file. |
 
-Open a `.md` file, then type `EPUB` in the Command Palette to find both commands.
+Open a `.md` file, then type `Markdown Ebook Review` or `EPUB` in the Command Palette to find both commands.
 
 ### Reader toolbar
 
@@ -149,7 +164,7 @@ When a viewport is larger than the panel, the extension scales the complete fram
 
 Select text in the book to highlight it in yellow, green, blue, pink, or purple, or choose `Note` to add a comment. Clicking a highlight opens it for editing. The Notes drawer can navigate to, edit, or delete any note.
 
-The Markdown source is not modified. Notes are stored in `<book>.md.notes.json`:
+The Markdown source is not modified. Notes are stored in `<book>.md.notes.json`, where both people and AI assistants can connect each instruction to its chapter, source range, and quoted text:
 
 ```jsonc
 {
@@ -168,6 +183,10 @@ The Markdown source is not modified. Notes are stored in `<book>.md.notes.json`:
   ]
 }
 ```
+
+For example, you can attach the Markdown file and its sidecar to an AI conversation with an instruction such as:
+
+> Revise `book.md` according to `book.md.notes.json`. Use each note's `range` and `quote` to locate the passage, treat the `note` field as the revision instruction, preserve unrelated text, and report any note you cannot resolve safely.
 
 `range` uses zero-based Markdown line and column coordinates. Marks longer than 120 characters retain their head and tail with a language-neutral `[…N…]` marker and a `quoteLength` field.
 
@@ -230,7 +249,7 @@ Architecture details and measured tradeoffs are documented in [`docs/architectur
 
 ## Community and support
 
-- Report reproducible bugs and propose features through [GitHub Issues](https://github.com/Raxwade/md-epub-preview/issues).
+- Report reproducible bugs and propose features through [GitHub Issues](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/issues).
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting a substantial change.
 - Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 - Project changes are recorded in [CHANGELOG.md](CHANGELOG.md).

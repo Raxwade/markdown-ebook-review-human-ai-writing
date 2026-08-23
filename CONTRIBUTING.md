@@ -1,8 +1,8 @@
 # Contributing
 
-Thank you for helping improve Markdown EPUB Preview. Bug reports, documentation,
-tests, translations, accessibility improvements, and code changes are all useful
-contributions.
+Thank you for helping improve Markdown Ebook Review — Human–AI Writing. Bug
+reports, documentation, tests, translations, accessibility improvements, and
+code changes are all useful contributions.
 
 ## Before you start
 
@@ -20,8 +20,8 @@ contributions.
 Prerequisites: Git, Node.js 20, npm, and VS Code 1.85 or newer.
 
 ```bash
-git clone https://github.com/Raxwade/md-epub-preview.git
-cd md-epub-preview
+git clone https://github.com/Raxwade/markdown-ebook-review-human-ai-writing.git
+cd markdown-ebook-review-human-ai-writing
 npm ci
 npm test
 ```

@@ -144,7 +144,7 @@ export class Preview {
 
         const panel = vscode.window.createWebviewPanel(
             'mdepub.preview',
-            `EPUB: ${path.basename(doc.uri.fsPath)}`,
+            `Ebook Review: ${path.basename(doc.uri.fsPath)}`,
             { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
             {
                 enableScripts: true,
@@ -172,7 +172,7 @@ export class Preview {
         // that cache here flushes the 500 ms debounce before `doc` changes.
         void this.flushBookState()
         this.doc = next
-        this.panel.title = `EPUB: ${path.basename(next.uri.fsPath)}`
+        this.panel.title = `Ebook Review: ${path.basename(next.uri.fsPath)}`
         this.watchNotes()
         this.postBookReaderState()
         void this.rebuild(false)
