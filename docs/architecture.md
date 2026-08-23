@@ -340,7 +340,7 @@ M1 already provides a general Markdown-to-EPUB exporter. M2 through M5 deliver t
 
 ## 10. Notes and highlights
 
-Reviewers can select rendered text, choose a color, and write a comment. The extension stores the result beside the Markdown file so an AI agent can read the source and review instructions together. **The Markdown file itself is never modified.**
+Reviewers can select rendered text or click an image, choose a color, and write a comment. Every color choice opens the comment editor; an empty comment remains a valid color-only highlight. The extension stores the result beside the Markdown file so an AI agent can read the source and review instructions together. **The Markdown file itself is never modified.**
 
 ### 10.1 Why anchors have two layers
 
@@ -350,6 +350,8 @@ Reviewers can select rendered text, choose a color, and write a comment. The ext
 | `{startLine, startCol, endLine, endCol}` | Storage and AI-agent interpretation | Yes. It refers to the edited Markdown source. |
 
 `data-md-line` bridges the two. markdown-it block tokens carry `token.map`, relative to the chapter. `render.ts` adds the chapter's source offset and writes absolute source lines into each block element. These attributes exist only in preview builds, not exported EPUBs.
+
+Image notes add an optional `target: { type: "image", src, alt }`. Preview rendering preserves the original Markdown destination in `data-md-image-src` before EPUB asset rewriting changes the live `src`. Re-anchoring searches image syntax outward from the stored line, preferring the destination and using alt text for reference-style images. The webview then locates the matching preview image and derives a fresh CFI from a DOM range around the element.
 
 An anchor is an interval, not a key. A fenced code block or hard-wrapped paragraph may span several source lines, so rendering also writes the exclusive `data-md-line-end`. The webview finds elements that contain a line rather than querying an exact start line. When nested elements cover the same line, it chooses the last match in document order, which is the innermost block used when measuring columns.
 
@@ -366,6 +368,8 @@ If a single-line search fails, re-anchoring joins subsequent non-empty lines int
 Notes are stored in `<book>.md.notes.json` beside the manuscript. Deleting the file removes all notes by design, so `preview.ts` watches it. Deleting the final note removes the empty sidecar.
 
 Long selections are abbreviated in storage: when a quote exceeds 120 characters, the first and last 45 characters are kept along with `quoteLength`. This avoids copying large portions of the manuscript into the review file while retaining enough text for re-anchoring.
+
+Removing a stale note crosses a filesystem boundary and therefore belongs to the extension host, not the webview. The host revalidates that the requested note is still stale, then presents Archive, Discard, and Cancel. Archive opens a Save dialog at `<markdown-name>_closed_notes.<YYYY-MM-DD-HH-mm>.json` by default and writes `{version, source, closedAt, reason: "source-target-not-found", notes}` before changing the active sidecar. A failed or cancelled archive leaves the note untouched. The drawer can submit all stale IDs for the same bulk workflow.
 
 ### 10.3 Navigate from the note list
 
@@ -387,9 +391,9 @@ This is character filtering, not a second Markdown render. Re-anchoring runs for
 
 A stale note draws no highlight because `anchorInDocument` returns `null`. A gray selection still visible after focus leaves the frame may be the browser's native selection, not an extension highlight.
 
-### 10.5 When the original quote cannot be found
+### 10.5 When the original source target cannot be found
 
-The note is preserved and marked stale rather than deleted. Review comments are more valuable than perfect anchors, and an unrelated edit must not silently erase them. The panel shows a warning with separate Edit and Delete actions.
+The note is preserved and marked stale rather than deleted. Review comments are more valuable than perfect anchors, and an unrelated edit must not silently erase them. Deletion requires an explicit archive or discard choice as described in §10.2.
 
 ### 10.6 Three silent failure modes
 

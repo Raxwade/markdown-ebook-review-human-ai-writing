@@ -32,7 +32,8 @@ reader-state behavior; it records measured constraints and rejected approaches.
 - Phone, tablet, e-reader, desktop, panel, and custom viewports.
 - Reader appearance controls, whole-book search, bookmarks, progress, and
   navigation history.
-- Highlights and structured notes stored outside the Markdown source.
+- Text and image highlights with structured notes stored outside the Markdown
+  source, plus explicit archive/discard handling for stale notes.
 - Standards-based EPUB export with frontmatter, images, covers, custom CSS, and
   configurable chapter splitting.
 - English source/fallback UI and Traditional Chinese localization.
@@ -109,6 +110,10 @@ node --test out/test/split.test.js
   cross the iframe boundary. Assert computed styles rather than SVG attributes.
 - A note receives exactly one CFI, derived by `anchorInDocument()`. Persist the
   Markdown range and quote, not the transient CFI.
+- Image notes add an optional `target` containing the original Markdown image
+  destination and alt text; keep older text-only sidecars compatible.
+- Stale-note removal must be confirmed. Archive before mutating the active
+  sidecar, and leave it unchanged when the archive is cancelled or fails.
 - `data-md-line` describes a source span, not a unique key. Multi-line blocks
   require containment lookup using `data-md-line-end`.
 - The sidecar range for a multi-line block can use the block's start line and a

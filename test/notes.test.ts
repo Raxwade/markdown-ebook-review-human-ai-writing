@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-    elideQuote, quoteEnds, isElided, parseNotes, serializeNotes, anchorNote,
+    elideQuote, quoteEnds, isElided, parseNotes, serializeClosedNotes, serializeNotes, anchorNote,
     ELIDE_OVER, type Note,
 } from '../src/notes'
 
@@ -50,6 +50,29 @@ test('marks round-trip through the file', () => {
     const { file: back, warnings } = parseNotes(serializeNotes(file), 'book.md')
     assert.deepEqual(warnings, [])
     assert.deepEqual(back, file)
+})
+
+test('image targets round-trip without changing the version 1 sidecar', () => {
+    const image = noteAt({
+        target: { type: 'image', src: 'images/map.png', alt: 'Route map' },
+        quote: 'Route map',
+    })
+    const file = { version: 1 as const, source: 'book.md', notes: [image] }
+    assert.deepEqual(parseNotes(serializeNotes(file), 'book.md').file, file)
+})
+
+test('closed-note archives carry a closure timestamp and regular note records', () => {
+    const text = serializeClosedNotes({
+        version: 1,
+        source: 'book.md',
+        closedAt: '2026-08-23T06:05:00.000Z',
+        reason: 'source-target-not-found',
+        notes: [noteAt()],
+    })
+    const file = JSON.parse(text)
+    assert.equal(file.closedAt, '2026-08-23T06:05:00.000Z')
+    assert.equal(file.reason, 'source-target-not-found')
+    assert.equal(file.notes[0].id, 'n1')
 })
 
 test('notes are written in book order so diffs stay small', () => {
@@ -166,6 +189,27 @@ test('an elided long mark re-anchors on its head', () => {
 
 test('an empty quote cannot anchor and says so', () => {
     assert.equal(anchorNote(noteAt({ quote: '' }), DOC).status, 'stale')
+})
+
+test('an image note follows its Markdown image after lines are inserted', () => {
+    const note = noteAt({
+        range: { startLine: 2, startCol: 0, endLine: 2, endCol: 0 },
+        target: { type: 'image', src: 'images/map.png', alt: 'Route map' },
+        quote: 'Route map',
+    })
+    const original = '# Trip\n\n![Route map](images/map.png)\n'
+    const shifted = 'Introduction\n\n' + original
+    assert.deepEqual(anchorNote(note, original), { note, status: 'ok', line: 2 })
+    assert.deepEqual(anchorNote(note, shifted), { note, status: 'moved', line: 4 })
+})
+
+test('an image note becomes stale when the image is removed', () => {
+    const note = noteAt({
+        range: { startLine: 2, startCol: 0, endLine: 2, endCol: 0 },
+        target: { type: 'image', src: 'images/map.png', alt: 'Route map' },
+        quote: 'Route map',
+    })
+    assert.equal(anchorNote(note, '# Trip\n\nThe map was removed.\n').status, 'stale')
 })
 
 // A mark covering two paragraphs matches no single line, so it goes down the

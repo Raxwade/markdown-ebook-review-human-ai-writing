@@ -17,12 +17,22 @@ export interface NoteRange {
     endCol: number
 }
 
+export interface ImageTarget {
+    type: 'image'
+    /** The image reference as resolved by markdown-it before EPUB asset rewriting. */
+    src: string
+    /** Rendered alternative text, which may legitimately be empty. */
+    alt: string
+}
+
 export interface Note {
     id: string
     color: Color
     /** Chapter title at the time of marking; for reading, not for anchoring. */
     chapter: string
     range: NoteRange
+    /** Present for an image annotation; absent for a text selection. */
+    target?: ImageTarget
     /**
      * The marked text. Elided in the middle past ELIDE_OVER characters — see
      * elideQuote — in which case `quoteLength` carries the true length.
@@ -40,6 +50,12 @@ export interface NotesFile {
     /** Filename of the markdown this belongs to, for a reader opening it alone. */
     source: string
     notes: Note[]
+}
+
+export interface ClosedNotesFile extends NotesFile {
+    /** ISO 8601 timestamp recording when these stale notes left the active file. */
+    closedAt: string
+    reason: 'source-target-not-found'
 }
 
 /**
@@ -100,6 +116,17 @@ function parseRange(v: unknown): NoteRange | null {
     // typo in a column has to come back as a warning, not as a vanished mark.
     if (endLine === startLine && endCol! < startCol!) return null
     return { startLine: startLine!, startCol: startCol!, endLine: endLine!, endCol: endCol! }
+}
+
+function parseTarget(v: unknown): ImageTarget | undefined {
+    if (!v || typeof v !== 'object') return undefined
+    const target = v as Record<string, unknown>
+    if (target.type !== 'image' || typeof target.src !== 'string' || !target.src) return undefined
+    return {
+        type: 'image',
+        src: target.src,
+        alt: typeof target.alt === 'string' ? target.alt : '',
+    }
 }
 
 export interface ParseResult {
@@ -175,11 +202,13 @@ export function parseNotes(json: string, source: string, locale: NotesLocale = '
         // deleting one silently delete the other.
         const id = typeof n.id === 'string' && n.id && !seen.has(n.id) ? n.id : `n${i + 1}-${range.startLine}`
         seen.add(id)
+        const target = parseTarget(n.target)
         notes.push({
             id,
             color: isColor(n.color) ? n.color : 'yellow',
             chapter: typeof n.chapter === 'string' ? n.chapter : '',
             range,
+            ...(target ? { target } : {}),
             quote: typeof n.quote === 'string' ? n.quote : '',
             ...(typeof n.quoteLength === 'number' ? { quoteLength: n.quoteLength } : {}),
             note: typeof n.note === 'string' ? n.note : '',
@@ -198,6 +227,19 @@ export function serializeNotes(file: NotesFile): string {
     const notes = [...file.notes].sort((a, b) =>
         a.range.startLine - b.range.startLine || a.range.startCol - b.range.startCol)
     return JSON.stringify({ version: 1, source: file.source, notes }, null, 2) + '\n'
+}
+
+/** A closed-notes archive uses the same note records plus an explicit closure time. */
+export function serializeClosedNotes(file: ClosedNotesFile): string {
+    const notes = [...file.notes].sort((a, b) =>
+        a.range.startLine - b.range.startLine || a.range.startCol - b.range.startCol)
+    return JSON.stringify({
+        version: 1,
+        source: file.source,
+        closedAt: file.closedAt,
+        reason: file.reason,
+        notes,
+    }, null, 2) + '\n'
 }
 
 // --- re-anchoring --------------------------------------------------------
@@ -263,6 +305,31 @@ const matchable = (s: string): string => s.replace(LINK_TARGET, ']').replace(SYN
  */
 export function anchorNote(note: Note, markdown: string): Anchored {
     const lines = markdown.split('\n')
+
+    if (note.target?.type === 'image') {
+        const sourceMatches: number[] = []
+        const altMatches: number[] = []
+        // Covers inline and reference-style Markdown images, including a direct
+        // destination wrapped in angle brackets. The persisted resolved src is
+        // preferred; alt text is the fallback for reference-style images whose
+        // destination appears only in a later link definition.
+        const image = /!\[([^\]]*)\](?:\(\s*(?:<([^>]+)>|([^\s)]+))[^)]*\)|\[([^\]]*)\])/gs
+        for (const match of markdown.matchAll(image)) {
+            const alt = match[1] ?? ''
+            const src = match[2] ?? match[3] ?? ''
+            const before = markdown.slice(0, match.index)
+            const line = (before.match(/\n/g) ?? []).length
+            if (src === note.target.src) sourceMatches.push(line)
+            else if (note.target.alt && alt === note.target.alt) altMatches.push(line)
+        }
+        const matches = sourceMatches.length ? sourceMatches : altMatches
+        if (!matches.length) return { note, status: 'stale', line: note.range.startLine }
+        const line = matches.reduce((best, candidate) =>
+            Math.abs(candidate - note.range.startLine) < Math.abs(best - note.range.startLine)
+                ? candidate : best)
+        return { note, status: line === note.range.startLine ? 'ok' : 'moved', line }
+    }
+
     const { head } = quoteEnds(note.quote)
     const needle = matchable(head)
     if (!needle) return { note, status: 'stale', line: note.range.startLine }

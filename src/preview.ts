@@ -13,7 +13,7 @@ import {
     manuscriptId,
     readerProfileStyles,
 } from './reader-state'
-import { hostText, uiLocale } from './i18n'
+import { hostCount, hostText, uiLocale } from './i18n'
 
 const currentLocale = () => uiLocale(vscode.env.language)
 
@@ -24,6 +24,8 @@ interface Host {
     sourcePathFor(uri: vscode.Uri): string | undefined
     readNotes(docPath: string): { file: NotesFile; warnings: string[] }
     writeNotes(docPath: string, file: NotesFile): void
+    closedNotesPathFor(docPath: string, at?: Date): string
+    writeClosedNotes(docPath: string, targetPath: string, notes: Note[], closedAt?: string): void
     readerStore: ReaderStateStore
 }
 
@@ -74,6 +76,10 @@ export class Preview {
                 // The webview has no filesystem; every write comes through here.
                 if (msg?.type === 'notes:save' && Array.isArray(msg.notes)) {
                     this.saveNotes(msg.notes as Note[])
+                    return
+                }
+                if (msg?.type === 'notes:close-stale' && Array.isArray(msg.ids)) {
+                    void this.closeStaleNotes(msg.ids.filter((id: unknown): id is string => typeof id === 'string'))
                     return
                 }
                 if (msg?.type === 'reader:profile-save') {
@@ -236,6 +242,76 @@ export class Preview {
         }
         // Echo the saved state back rather than trusting the panel's copy, so
         // what is drawn is always what is on disk.
+        this.postNotes()
+    }
+
+    /**
+     * Remove stale notes only after the user explicitly archives or discards.
+     *
+     * The host re-checks staleness against the current Markdown rather than
+     * trusting a webview flag that may have been superseded by an edit. Archive
+     * output is written before the active sidecar changes, so a failed or
+     * cancelled save cannot lose review instructions.
+     */
+    private async closeStaleNotes(ids: string[]): Promise<void> {
+        const requested = new Set(ids)
+        const { file } = this.host.readNotes(this.doc.uri.fsPath)
+        const stale = anchorAll(file.notes, this.doc.getText())
+            .filter(item => item.status === 'stale' && requested.has(item.note.id))
+            .map(item => item.note)
+        if (!stale.length) {
+            this.postNotes()
+            return
+        }
+
+        const locale = currentLocale()
+        const archive = hostText(locale, 'archiveStale')
+        const discard = hostText(locale, 'discardStale')
+        const choice = await vscode.window.showWarningMessage(
+            hostCount(locale, 'closeStalePrompt', stale.length),
+            { modal: true, detail: hostText(locale, 'closeStaleDetail') },
+            archive,
+            discard,
+        )
+        if (choice !== archive && choice !== discard) return
+
+        if (choice === archive) {
+            const target = await vscode.window.showSaveDialog({
+                title: hostText(locale, 'staleArchiveSaveTitle'),
+                defaultUri: vscode.Uri.file(this.host.closedNotesPathFor(this.doc.uri.fsPath)),
+                saveLabel: archive,
+                filters: { JSON: ['json'] },
+            })
+            if (!target) return
+            const resolvedTarget = path.resolve(target.fsPath)
+            const manuscript = path.resolve(this.doc.uri.fsPath)
+            const activeNotes = path.resolve(`${this.doc.uri.fsPath}.notes.json`)
+            if (resolvedTarget === manuscript || resolvedTarget === activeNotes) {
+                void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveUnsafePath'))
+                return
+            }
+            try {
+                this.host.writeClosedNotes(this.doc.uri.fsPath, target.fsPath, stale)
+            } catch (err) {
+                void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveFailed', {
+                    error: (err as Error).message,
+                }))
+                return
+            }
+        }
+
+        const closed = new Set(stale.map(note => note.id))
+        try {
+            this.host.writeNotes(this.doc.uri.fsPath, {
+                version: 1,
+                source: path.basename(this.doc.uri.fsPath),
+                notes: file.notes.filter(note => !closed.has(note.id)),
+            })
+        } catch (err) {
+            void vscode.window.showErrorMessage(hostText(locale, 'notesSaveFailed', {
+                error: (err as Error).message,
+            }))
+        }
         this.postNotes()
     }
 

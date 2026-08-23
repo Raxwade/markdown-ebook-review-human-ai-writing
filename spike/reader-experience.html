@@ -111,7 +111,28 @@ async function run() {
     selection.removeAllRanges(); selection.addRange(range)
     content.doc.dispatchEvent(new content.doc.defaultView.MouseEvent('mouseup', { bubbles: true }))
     page.document.querySelector('#mark-bar .swatch[data-color="yellow"]').click()
+    check('colour choice opens note editor', !page.document.getElementById('note-editor').hidden)
+    page.document.querySelector('#note-cancel').click()
     await wait(250)
+  }
+
+  const previewImage = content.doc.querySelector('img[data-md-image-src]')
+  if (previewImage) {
+    previewImage.dispatchEvent(new content.doc.defaultView.MouseEvent('mouseup', { bubbles: true }))
+    page.document.querySelector('#mark-bar .swatch[data-color="purple"]').click()
+    const editor = page.document.getElementById('note-editor')
+    check('image click opens note editor', !editor.hidden)
+    page.document.getElementById('note-text').value = 'Review this image.'
+    page.document.getElementById('note-save').click()
+    await wait(250)
+    const savedImage = [...page.__toExtension].reverse()
+      .find(message => message.type === 'notes:save'
+        && message.notes?.some(note => note.target?.type === 'image'))
+    check('image note preserves Markdown target',
+      savedImage?.notes?.some(note => note.target?.src === 'evidence/notes-highlight.png'))
+  } else {
+    check('image click opens note editor', false, 'fixture image missing')
+    check('image note preserves Markdown target', false, 'fixture image missing')
   }
   const marksBefore = view.renderer.getContents()[0].overlayer?.element.children.length ?? 0
   check('annotation fixture drawn', marksBefore > 0, marksBefore)

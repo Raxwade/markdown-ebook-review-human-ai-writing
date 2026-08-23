@@ -78,10 +78,12 @@ const EN_MESSAGES = {
     'notes.warningCount.other': '{path}: {count} issues',
     'notes.count.one': '{count} note',
     'notes.count.other': '{count} notes',
-    'notes.staleCount.one': '{count} source quote not found',
-    'notes.staleCount.other': '{count} source quotes not found',
-    'notes.empty': 'No notes yet. Select text in the book to add a highlight.',
-    'notes.stale': 'Source quote not found',
+    'notes.staleCount.one': '{count} source target not found',
+    'notes.staleCount.other': '{count} source targets not found',
+    'notes.empty': 'No notes yet. Select text or click an image in the book to add one.',
+    'notes.stale': 'Source target not found',
+    'notes.image': 'Image: {label}',
+    'notes.closeStale': 'Archive / discard stale…',
     'drawer.tools': 'Reader tools',
     'drawer.search': 'Search',
     'drawer.bookmarks': 'Bookmarks',
@@ -190,10 +192,12 @@ const ZH_TW_MESSAGES = {
     'notes.warningCount.other': '{path}：{count} 個問題',
     'notes.count.one': '{count} 則註記',
     'notes.count.other': '{count} 則註記',
-    'notes.staleCount.one': '{count} 則找不到原句',
-    'notes.staleCount.other': '{count} 則找不到原句',
-    'notes.empty': '還沒有註記。在書上選一段文字就能標記。',
-    'notes.stale': '找不到原句',
+    'notes.staleCount.one': '{count} 則找不到原始標記',
+    'notes.staleCount.other': '{count} 則找不到原始標記',
+    'notes.empty': '還沒有註記。在書上選取文字或點選圖片來新增註記。',
+    'notes.stale': '找不到原始標記',
+    'notes.image': '圖片：{label}',
+    'notes.closeStale': '封存／捨棄失效註記…',
     'drawer.tools': '閱讀工具',
     'drawer.search': '搜尋',
     'drawer.bookmarks': '書籤',
@@ -335,6 +339,7 @@ const el = {
     notesPanel: document.getElementById('notes-panel'),
     notesList: document.getElementById('notes-list'),
     notesSummary: document.getElementById('notes-summary'),
+    closeStaleNotes: document.getElementById('close-stale-notes'),
     notesPath: document.getElementById('notes-path'),
     editor: document.getElementById('note-editor'),
     editorQuote: document.getElementById('note-quote'),
@@ -888,8 +893,8 @@ function onSectionLoad(ev) {
     // Selection lives inside the paginated iframe, so the listener has to go on
     // that document. 'mouseup' rather than 'selectionchange': the latter fires
     // on every character as a drag grows, and the bar would chase the cursor.
-    doc.addEventListener('mouseup', () => {
-        const described = describeSelection(doc, index)
+    doc.addEventListener('mouseup', ev => {
+        const described = describeImage(doc, index, ev.target) ?? describeSelection(doc, index)
         if (!described) { hideMarkBar(); return }
         pending = described
         showMarkBar(described.rect)
@@ -1118,6 +1123,24 @@ function describeSelection(doc, index) {
     }
 }
 
+/** Turn a clicked preview image into a persistent Markdown-side anchor. */
+function describeImage(doc, index, target) {
+    const image = target?.closest?.('img[data-md-image-src]')
+    if (!image) return null
+    const startLine = lineOf(image)
+    const src = image.getAttribute('data-md-image-src') ?? ''
+    if (startLine == null || !src) return null
+    const alt = image.getAttribute('data-md-image-alt') ?? image.getAttribute('alt') ?? ''
+    return {
+        index,
+        chapter: el.view.lastLocation?.tocItem?.label?.trim() ?? '',
+        range: { startLine, startCol: 0, endLine: startLine, endCol: 0 },
+        target: { type: 'image', src, alt },
+        quote: alt || src,
+        rect: rectInFrame(doc, image),
+    }
+}
+
 /**
  * The selection's rectangle in the device frame's coordinates.
  *
@@ -1127,8 +1150,8 @@ function describeSelection(doc, index) {
  * it was pointing at, and the error grows with the frame's scale because
  * showMarkBar multiplies by it.
  */
-function rectInFrame(doc, range) {
-    const rect = range.getBoundingClientRect()
+function rectInFrame(doc, target) {
+    const rect = target.getBoundingClientRect()
     // The book's iframe element, which lives in the frame's document.
     const bookFrame = doc.defaultView.frameElement
     const offset = bookFrame ? bookFrame.getBoundingClientRect() : { left: 0, top: 0 }
@@ -1266,6 +1289,22 @@ function anchorInDocument(doc, index, note) {
     const line = note.line ?? note.range.startLine
     const block = blockForLine(doc, line)
     if (!block) return null
+
+    if (note.target?.type === 'image') {
+        const images = [
+            ...(block.matches?.('img[data-md-image-src]') ? [block] : []),
+            ...block.querySelectorAll('img[data-md-image-src]'),
+        ]
+        const image = images.find(candidate =>
+            candidate.getAttribute('data-md-image-src') === note.target.src)
+            ?? images.find(candidate =>
+                note.target.alt
+                && candidate.getAttribute('data-md-image-alt') === note.target.alt)
+        if (!image) return null
+        const range = doc.createRange()
+        try { range.selectNode(image) } catch { return null }
+        return range.collapsed ? null : range
+    }
 
     const walker = doc.createTreeWalker(block, NodeFilter.SHOW_TEXT)
     const nodes = []
@@ -1604,6 +1643,7 @@ function markSelection(color, thenEdit) {
         color,
         chapter: pending.chapter,
         range: pending.range,
+        ...(pending.target ? { target: pending.target } : {}),
         quote: pending.quote,
         ...(pending.quoteLength ? { quoteLength: pending.quoteLength } : {}),
         note: '',
@@ -1623,7 +1663,7 @@ function markSelection(color, thenEdit) {
 }
 
 for (const swatch of el.markBar.querySelectorAll('.swatch')) {
-    swatch.addEventListener('click', () => markSelection(swatch.dataset.color, false))
+    swatch.addEventListener('click', () => markSelection(swatch.dataset.color, true))
 }
 el.markNote.addEventListener('click', () => markSelection('yellow', true))
 
@@ -1642,7 +1682,9 @@ for (const color of COLORS) {
 
 function openEditor(note) {
     editing = note
-    el.editorQuote.textContent = note.quote
+    el.editorQuote.textContent = note.target?.type === 'image'
+        ? t('notes.image', { label: note.target.alt || note.target.src })
+        : note.quote
     el.editorText.value = note.note ?? ''
     for (const s of el.editorColors.children) {
         s.setAttribute('aria-pressed', String(s.dataset.color === note.color))
@@ -1669,6 +1711,11 @@ el.editorSave.addEventListener('click', () => {
 
 /** The one way a note goes away, from the editor and from the list alike. */
 function deleteNote(id) {
+    const note = notes.find(item => item.id === id)
+    if (note?.status === 'stale') {
+        vscode.postMessage({ type: 'notes:close-stale', ids: [id] })
+        return
+    }
     // Nothing on screen is that note any more, so nothing should read as selected.
     if (selectedId === id) selectedId = null
     saveNotes(notes.filter(n => n.id !== id))
@@ -2013,6 +2060,7 @@ function showNotesWarnings(warnings, notesPath) {
 function renderNoteList() {
     el.notesCount.textContent = notes.length ? String(notes.length) : ''
     const stale = notes.filter(n => n.status === 'stale').length
+    el.closeStaleNotes.hidden = stale === 0
     el.notesSummary.textContent = notes.length
         ? `${tCount('notes.count', notes.length)}${stale ? `  ⚠ ${tCount('notes.staleCount', stale)}` : ''}`
         : ''
@@ -2048,7 +2096,9 @@ function renderNoteList() {
 
         const quote = document.createElement('div')
         quote.className = 'quote'
-        quote.textContent = note.quote
+        quote.textContent = note.target?.type === 'image'
+            ? t('notes.image', { label: note.target.alt || note.target.src })
+            : note.quote
         item.append(quote)
 
         if (note.note) {
@@ -2081,6 +2131,11 @@ function renderNoteList() {
         el.notesList.append(item)
     }
 }
+
+el.closeStaleNotes.addEventListener('click', () => {
+    const ids = notes.filter(note => note.status === 'stale').map(note => note.id)
+    if (ids.length) vscode.postMessage({ type: 'notes:close-stale', ids })
+})
 
 /**
  * Clicking a note in the list: go to it, and mark it as the one being looked at.

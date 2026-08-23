@@ -8,6 +8,8 @@ export const commands_: Map<string, (...args: any[]) => any> = new Map()
 export const watchers: any[] = []
 export const globalValues = new Map<string, unknown>()
 export const globalUpdates: { key: string; value: unknown }[] = []
+export const warningResponses: Array<string | undefined> = []
+export const saveDialogResponses: Array<string | undefined> = []
 export let lastPanel: any = null
 export const env = { language: 'en' }
 
@@ -23,6 +25,8 @@ export function reset(): void {
     watchers.length = 0
     globalValues.clear()
     globalUpdates.length = 0
+    warningResponses.length = 0
+    saveDialogResponses.length = 0
     lastPanel = null
     settings.clear()
     settingScopes.clear()
@@ -97,8 +101,15 @@ export const window = {
         return activeDocument ? { document: activeDocument } : undefined
     },
     showErrorMessage: (text: string) => { messages.push({ kind: 'error', text }); return Promise.resolve(undefined) },
-    showWarningMessage: (text: string) => { messages.push({ kind: 'warning', text }); return Promise.resolve(undefined) },
+    showWarningMessage: (text: string, ..._items: unknown[]) => {
+        messages.push({ kind: 'warning', text })
+        return Promise.resolve(warningResponses.shift())
+    },
     showInformationMessage: (text: string) => { messages.push({ kind: 'info', text }); return Promise.resolve(undefined) },
+    showSaveDialog: (_options: unknown) => {
+        const response = saveDialogResponses.shift()
+        return Promise.resolve(response ? Uri.file(response) : undefined)
+    },
     createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
     onDidChangeActiveTextEditor: (fn: (editor: any) => void) => {
         activeEditorListener = fn

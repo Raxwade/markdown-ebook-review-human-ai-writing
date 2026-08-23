@@ -6,7 +6,13 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { DEFAULTS, type Config, type DeviceName } from './config'
 import { buildForExport } from './epub/build'
-import { parseNotes, serializeNotes, type NotesFile } from './notes'
+import {
+    parseNotes,
+    serializeClosedNotes,
+    serializeNotes,
+    type Note,
+    type NotesFile,
+} from './notes'
 import { Preview } from './preview'
 import { ReaderStateStore } from './reader-state'
 import { bookLocale, hostCount, hostText, uiLocale } from './i18n'
@@ -205,6 +211,37 @@ export function notesPathFor(docPath: string): string {
     return `${docPath}.notes.json`
 }
 
+/** Default archive name beside the manuscript, using local wall-clock time. */
+export function closedNotesPathFor(docPath: string, at = new Date()): string {
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const stamp = [
+        at.getFullYear(),
+        pad(at.getMonth() + 1),
+        pad(at.getDate()),
+        pad(at.getHours()),
+        pad(at.getMinutes()),
+    ].join('-')
+    const extension = path.extname(docPath)
+    const manuscript = path.basename(docPath, extension)
+    return path.join(path.dirname(docPath), `${manuscript}_closed_notes.${stamp}.json`)
+}
+
+/** Write stale notes to the user-selected archive before removing them. */
+export function writeClosedNotes(
+    docPath: string,
+    targetPath: string,
+    notes: Note[],
+    closedAt = new Date().toISOString(),
+): void {
+    fs.writeFileSync(targetPath, serializeClosedNotes({
+        version: 1,
+        source: path.basename(docPath),
+        closedAt,
+        reason: 'source-target-not-found',
+        notes,
+    }), 'utf8')
+}
+
 export function readNotes(docPath: string): { file: NotesFile; warnings: string[] } {
     const source = path.basename(docPath)
     try {
@@ -310,6 +347,8 @@ export function activate(context: vscode.ExtensionContext): void {
         sourcePathFor,
         readNotes,
         writeNotes,
+        closedNotesPathFor,
+        writeClosedNotes,
         readerStore: new ReaderStateStore(context.globalState),
     }
     context.subscriptions.push(

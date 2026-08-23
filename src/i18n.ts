@@ -36,13 +36,21 @@ const EN = {
     showDetails: 'Show Details',
     openMarkdownToPreview: 'mdepub: Open a Markdown file before starting the preview.',
     notesSaveFailed: 'mdepub: Could not save notes — {error}',
+    'closeStalePrompt.one': 'Remove {count} stale note from the active review file?',
+    'closeStalePrompt.other': 'Remove {count} stale notes from the active review file?',
+    closeStaleDetail: 'Archive writes the selected stale notes to a separate JSON file first. Discard removes them without an archive.',
+    archiveStale: 'Archive…',
+    discardStale: 'Discard',
+    staleArchiveSaveTitle: 'Archive stale notes',
+    staleArchiveFailed: 'mdepub: Could not archive stale notes — {error}',
+    staleArchiveUnsafePath: 'mdepub: Choose a new archive file; the manuscript and active notes file cannot be overwritten.',
     profileSaveFailed: 'mdepub: Could not save reading appearance — {error}',
     locationSaveFailed: 'mdepub: Could not save the reading location — {error}',
     previewBuildFailed: 'Build failed:\n{error}',
 } as const
 
 export type HostMessageKey = keyof typeof EN
-export type HostCountKey = 'exportSummary' | 'exportIssues'
+export type HostCountKey = 'exportSummary' | 'exportIssues' | 'closeStalePrompt'
 
 const ZH_TW: Record<HostMessageKey, string> = {
     customCssUnreadable: 'mdepub：讀不到自訂 CSS {path}，改用內建樣式。',
@@ -57,6 +65,14 @@ const ZH_TW: Record<HostMessageKey, string> = {
     showDetails: '查看詳細資訊',
     openMarkdownToPreview: 'mdepub：請先開啟 Markdown 檔再預覽。',
     notesSaveFailed: 'mdepub：註記存檔失敗 — {error}',
+    'closeStalePrompt.one': '要從目前的審閱檔移除 {count} 則失效註記嗎？',
+    'closeStalePrompt.other': '要從目前的審閱檔移除 {count} 則失效註記嗎？',
+    closeStaleDetail: '「封存」會先將選取的失效註記寫入另一個 JSON 檔；「捨棄」則不保留封存檔。',
+    archiveStale: '封存…',
+    discardStale: '捨棄',
+    staleArchiveSaveTitle: '封存失效註記',
+    staleArchiveFailed: 'mdepub：失效註記封存失敗 — {error}',
+    staleArchiveUnsafePath: 'mdepub：請選擇新的封存檔；不能覆寫原稿或目前的註記檔。',
     profileSaveFailed: 'mdepub：閱讀外觀存檔失敗 — {error}',
     locationSaveFailed: 'mdepub：閱讀位置存檔失敗 — {error}',
     previewBuildFailed: '建置失敗：\n{error}',

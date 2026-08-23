@@ -121,8 +121,8 @@
       <iframe id="frame" title="Device viewport" data-i18n-title="toolbar.device"></iframe>
     </div>
 
-    <!-- Follows the selection inside the device frame. Colours first, because
-         marking is the frequent action and writing a comment is the rarer one. -->
+    <!-- Follows a text selection or clicked image inside the device frame.
+         Every choice opens the editor; saving an empty note keeps a bare mark. -->
     <div id="mark-bar" hidden>
       <button class="swatch" data-color="yellow" title="Yellow" data-i18n-title="color.yellow"></button>
       <button class="swatch" data-color="green" title="Green" data-i18n-title="color.green"></button>
@@ -170,6 +170,8 @@
       <div class="drawer-subheader">
         <strong data-i18n="drawer.notes">Notes</strong>
         <span id="notes-summary"></span>
+        <span class="grow"></span>
+        <button id="close-stale-notes" hidden data-i18n="notes.closeStale">Archive / discard stale…</button>
       </div>
       <div id="notes-list" class="drawer-list"></div>
       <footer id="notes-path"></footer>

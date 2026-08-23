@@ -6,12 +6,19 @@ Notable project changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Add image annotations with source-linked targets in the JSON notes sidecar.
+- Add archive, discard, and cancel handling for stale notes, including a
+  user-selectable archive filename and bulk stale-note action.
+
 ### Security
 
 - Constrain workspace-provided custom CSS to the Markdown document's owning root.
 
 ### Changed
 
+- Open the note editor after every highlight color choice.
 - Rename the extension and package identity to **Markdown Ebook Review —
   Human–AI Writing** (`raxwade.markdown-ebook-review-human-ai-writing`) and
   describe its structured-note handoff for AI-assisted revision.

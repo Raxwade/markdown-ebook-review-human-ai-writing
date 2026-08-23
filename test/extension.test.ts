@@ -347,6 +347,117 @@ test('removing the last note removes the sidecar rather than leaving a husk', ()
     fs.rmSync(dir, { recursive: true, force: true })
 })
 
+test('closed-note archives use the requested default name and preserve records', () => {
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-closed-'))
+    const mdPath = path.join(dir, 'my-book.md')
+    const at = new Date(2026, 7, 23, 14, 5)
+    const target = extension.closedNotesPathFor(mdPath, at)
+    assert.equal(target, path.join(dir, 'my-book_closed_notes.2026-08-23-14-05.json'))
+
+    const note = {
+        id: 'stale-1', color: 'purple' as const, chapter: 'A',
+        range: { startLine: 2, startCol: 0, endLine: 2, endCol: 4 },
+        quote: 'old text', note: 'Rewrite this.', created: '2026-08-23T05:00:00Z',
+    }
+    extension.writeClosedNotes(mdPath, target, [note], '2026-08-23T06:05:00.000Z')
+    const archive = JSON.parse(fs.readFileSync(target, 'utf8'))
+    assert.equal(archive.source, 'my-book.md')
+    assert.equal(archive.closedAt, '2026-08-23T06:05:00.000Z')
+    assert.equal(archive.reason, 'source-target-not-found')
+    assert.deepEqual(archive.notes, [note])
+    fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('discarding a stale note requires the host dialog and removes it without an archive', async () => {
+    activate()
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-stale-'))
+    const mdPath = path.join(dir, 'book.md')
+    const body = '# A\n\nreplacement text\n'
+    fs.writeFileSync(mdPath, body)
+    extension.writeNotes(mdPath, {
+        version: 1,
+        source: 'book.md',
+        notes: [{
+            id: 'stale-1', color: 'yellow', chapter: 'A',
+            range: { startLine: 2, startCol: 0, endLine: 2, endCol: 8 },
+            quote: 'old text', note: 'Rewrite this.', created: '2026-08-23T05:00:00Z',
+        }],
+    })
+    stub.setActiveDocument(fakeDoc(body, mdPath))
+    stub.commands.executeCommand('mdepub.preview')
+    stub.lastPanel.receive({ type: 'ready' })
+    stub.warningResponses.push('Discard')
+    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(fs.existsSync(extension.notesPathFor(mdPath)), false)
+    assert.ok(stub.messages.some(message =>
+        message.kind === 'warning' && /Remove 1 stale note/.test(message.text)))
+    assert.equal(fs.readdirSync(dir).some(name => name.includes('_closed_notes.')), false)
+    fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('archiving a stale note writes the chosen file before removing it', async () => {
+    activate()
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-archive-'))
+    const mdPath = path.join(dir, 'book.md')
+    const archivePath = path.join(dir, 'my-reviewed-notes.json')
+    const body = '# A\n\nreplacement text\n'
+    fs.writeFileSync(mdPath, body)
+    extension.writeNotes(mdPath, {
+        version: 1,
+        source: 'book.md',
+        notes: [{
+            id: 'stale-1', color: 'green', chapter: 'A',
+            range: { startLine: 2, startCol: 0, endLine: 2, endCol: 8 },
+            quote: 'old text', note: 'Rewrite this.', created: '2026-08-23T05:00:00Z',
+        }],
+    })
+    stub.setActiveDocument(fakeDoc(body, mdPath))
+    stub.commands.executeCommand('mdepub.preview')
+    stub.lastPanel.receive({ type: 'ready' })
+    stub.warningResponses.push('Archive…')
+    stub.saveDialogResponses.push(archivePath)
+    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(fs.existsSync(extension.notesPathFor(mdPath)), false)
+    const archive = JSON.parse(fs.readFileSync(archivePath, 'utf8'))
+    assert.deepEqual(archive.notes.map((note: { id: string }) => note.id), ['stale-1'])
+    assert.equal(typeof archive.closedAt, 'string')
+    fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('a stale-note archive cannot overwrite the manuscript or active sidecar', async () => {
+    activate()
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-safe-archive-'))
+    const mdPath = path.join(dir, 'book.md')
+    const body = '# A\n\nreplacement text\n'
+    fs.writeFileSync(mdPath, body)
+    extension.writeNotes(mdPath, {
+        version: 1,
+        source: 'book.md',
+        notes: [{
+            id: 'stale-1', color: 'green', chapter: 'A',
+            range: { startLine: 2, startCol: 0, endLine: 2, endCol: 8 },
+            quote: 'old text', note: 'Keep me.', created: '2026-08-23T05:00:00Z',
+        }],
+    })
+    stub.setActiveDocument(fakeDoc(body, mdPath))
+    stub.commands.executeCommand('mdepub.preview')
+    stub.lastPanel.receive({ type: 'ready' })
+    stub.warningResponses.push('Archive…')
+    stub.saveDialogResponses.push(mdPath)
+    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    await new Promise(resolve => setImmediate(resolve))
+
+    assert.equal(fs.readFileSync(mdPath, 'utf8'), body)
+    assert.equal(extension.readNotes(mdPath).file.notes.length, 1)
+    assert.ok(stub.messages.some(message =>
+        message.kind === 'error' && /cannot be overwritten/.test(message.text)))
+    fs.rmSync(dir, { recursive: true, force: true })
+})
+
 test('the panel watches the sidecar and re-sends notes when it changes', () => {
     activate()
     const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-notes-'))

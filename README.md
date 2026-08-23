@@ -162,7 +162,7 @@ When a viewport is larger than the panel, the extension scales the complete fram
 
 ## Highlights and notes
 
-Select text in the book to highlight it in yellow, green, blue, pink, or purple, or choose `Note` to add a comment. Clicking a highlight opens it for editing. The Notes drawer can navigate to, edit, or delete any note.
+Select text or click an image in the book, then choose yellow, green, blue, pink, purple, or `Note`. Every choice opens the note editor so you can immediately add an instruction; saving an empty comment still creates a color-only highlight. Clicking an existing highlight opens it for editing. The Notes drawer can navigate to, edit, or delete any note.
 
 The Markdown source is not modified. Notes are stored in `<book>.md.notes.json`, where both people and AI assistants can connect each instruction to its chapter, source range, and quoted text:
 
@@ -184,13 +184,19 @@ The Markdown source is not modified. Notes are stored in `<book>.md.notes.json`,
 }
 ```
 
+Image notes use the same schema with an additional stable target:
+
+```jsonc
+"target": { "type": "image", "src": "images/map.png", "alt": "Route map" }
+```
+
 For example, you can attach the Markdown file and its sidecar to an AI conversation with an instruction such as:
 
-> Revise `book.md` according to `book.md.notes.json`. Use each note's `range` and `quote` to locate the passage, treat the `note` field as the revision instruction, preserve unrelated text, and report any note you cannot resolve safely.
+> Revise `book.md` according to `book.md.notes.json`. Use each note's `range` and `quote`, plus `target` when present, to locate the passage or image. Treat the `note` field as the revision instruction, preserve unrelated content, and report any note you cannot resolve safely.
 
 `range` uses zero-based Markdown line and column coordinates. Marks longer than 120 characters retain their head and tail with a language-neutral `[…N…]` marker and a `quoteLength` field.
 
-Deleting the sidecar removes every highlight immediately. If editing makes a quote impossible to re-anchor, the note remains in the list with a warning and explicit Edit and Delete actions.
+Deleting the sidecar removes every highlight immediately. If revision makes a text or image target impossible to re-anchor, the note remains in the list with a warning. Deleting a stale note always asks whether to archive it, discard it, or cancel. Archive opens a Save dialog whose default is `<markdown-name>_closed_notes.<YYYY-MM-DD-HH-mm>.json`; the filename can be changed. The Notes drawer also provides a bulk Archive / Discard action for all stale notes.
 
 ## Settings
 

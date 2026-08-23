@@ -101,6 +101,20 @@ for (const name of ['fence', 'code_block']) {
     }
 }
 
+// Image notes need a stable bridge back to the Markdown destination. The EPUB
+// asset pass rewrites `src` to a packaged `assets/...` path, so the original
+// reference rides in a preview-only data attribute before that rewrite occurs.
+// Export rendering uses the separate `md` instance and never receives it.
+const originalImage = mdTagged.renderer.rules.image
+mdTagged.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const token = tokens[idx]!
+    token.attrSet('data-md-image-src', token.attrGet('src') ?? '')
+    token.attrSet('data-md-image-alt', token.content ?? '')
+    return originalImage
+        ? originalImage(tokens, idx, options, env, self)
+        : self.renderToken(tokens, idx, options)
+}
+
 /**
  * Render a chapter's markdown body to an XHTML fragment (no document wrapper).
  *

@@ -70,6 +70,16 @@ test('void elements are self-closed for XHTML', () => {
     assertWellFormed(xml, 'chapter with void elements')
 })
 
+test('preview images retain their Markdown target for image notes', () => {
+    const source = '![Route map](images/map.png)\n'
+    const preview = renderFragment(source, 0)
+    const exported = renderFragment(source)
+    assert.match(preview, /data-md-image-src="images\/map\.png"/)
+    assert.match(preview, /data-md-image-alt="Route map"/)
+    assert.doesNotMatch(exported, /data-md-image-/)
+    assertWellFormed(renderChapter(source, 'T', { ...opts, lineOffset: 0 }), 'tagged image chapter')
+})
+
 test('tables, code fences and blockquotes stay well-formed', () => {
     const src = [
         '| a | b |', '|---|---|', '| 1 | 2 |', '',

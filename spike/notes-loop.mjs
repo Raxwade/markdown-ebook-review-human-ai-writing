@@ -131,6 +131,8 @@ const MARKDOWN = `# 註記迴圈
 | 欄一 | 欄二 | 欄三 |
 |---|---|---|
 | 甲 | 78 KB | 0.2 ms |
+
+![Review diagram](evidence/notes-highlight.png)
 `
 
 const result = buildForPreview({
@@ -138,7 +140,10 @@ const result = buildForPreview({
     config: { ...DEFAULTS, splitLevel: 2 },
     basename: 'notes',
     sourcePath: 'spike/notes.md',
-    readAsset: () => null,
+    readAsset: ref => {
+        try { return new Uint8Array(readFileSync(join(here, ref))) }
+        catch { return null }
+    },
 })
 
 const out = join(here, 'notes.epub')
@@ -185,6 +190,8 @@ const mark = (i, nth, a, b, color) => {
     const sel = doc.defaultView.getSelection(); sel.removeAllRanges(); sel.addRange(rng)
     doc.dispatchEvent(new doc.defaultView.MouseEvent('mouseup', { bubbles: true }))
     document.querySelector('#mark-bar .swatch[data-color="' + color + '"]').click()
+    mark.editorOpened = editorOpen()
+    document.querySelector('#note-cancel').click()
     return rng.getBoundingClientRect()
 }
 const clickMark = (i, r) => {
@@ -196,6 +203,7 @@ const clickMark = (i, r) => {
 const del = async () => { document.querySelector('#note-delete').click(); await settle() }
 
 const rA = mark(0, 1, 2, 10, 'yellow'); await settle()
+ok('0b. choosing a colour opens the note editor', mark.editorOpened)
 const rB = mark(0, 2, 2, 12, 'green');  await settle()
 ok('1. two marks, two drawings', marks(0) === 2, marks(0))
 
@@ -241,6 +249,7 @@ rngD.setStart(codeNode, from); rngD.setEnd(codeNode, from + 10)
 const selD = docD.defaultView.getSelection(); selD.removeAllRanges(); selD.addRange(rngD)
 docD.dispatchEvent(new docD.defaultView.MouseEvent('mouseup', { bubbles: true }))
 document.querySelector('#mark-bar .swatch[data-color="blue"]').click()
+document.querySelector('#note-cancel').click()
 await settle()
 const inCode = sent().notes.at(-1)
 // Posted directly rather than through echo(), which forces every note to
@@ -326,6 +335,7 @@ rT.setStart(cells[1].firstChild, 0); rT.setEnd(cells[2].firstChild, 5)
 const selT = docT.defaultView.getSelection(); selT.removeAllRanges(); selT.addRange(rT)
 docT.dispatchEvent(new docT.defaultView.MouseEvent('mouseup', { bubbles: true }))
 document.querySelector('#mark-bar .swatch[data-color="purple"]').click()
+document.querySelector('#note-cancel').click()
 await settle()
 const cellNote = sent().notes.at(-1)
 ok('12. a mark across table cells keeps the cells apart, and draws',
@@ -339,4 +349,20 @@ window.postMessage({ type: 'notes', warnings: [], path: 'notes.md.notes.json',
     notes: [{ ...cellNote, status: 'stale', line: cellNote.range.startLine }] }, '*')
 await settle()
 ok('13. a stale note paints nothing', drawnIn(2) === 0, 'drawn=' + drawnIn(2))
+
+// Images cannot be text-selected. Clicking one must produce the same palette,
+// persist its original Markdown destination, and open the note editor.
+echo([]); await settle()
+const image = docT.querySelector('img[data-md-image-src]')
+image.dispatchEvent(new image.ownerDocument.defaultView.MouseEvent('mouseup', { bubbles: true }))
+document.querySelector('#mark-bar .swatch[data-color="green"]').click()
+const imageEditor = editorOpen()
+document.querySelector('#note-text').value = 'Check this image.'
+document.querySelector('#note-save').click()
+await settle()
+const imageNote = sent().notes.at(-1)
+ok('14. an image can carry a colour and note',
+    imageEditor && imageNote.target?.type === 'image'
+        && imageNote.target.src === 'evidence/notes-highlight.png' && drawnIn(2) === 1,
+    JSON.stringify(imageNote.target), 'editor=' + imageEditor, 'drawn=' + drawnIn(2))
 `)
