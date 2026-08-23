@@ -1,81 +1,154 @@
-# CLAUDE.md
+# Repository Agent Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the source for both `CLAUDE.md` and the `AGENTS.md` symlink. It
+provides current guidance for coding agents working in this repository.
 
-A VSCode extension that renders any `.md` → real EPUB → live preview in a side panel, with no pandoc/calibre dependency.
+## Product identity and purpose
 
-`docs/architecture.md` is the spec of record (Traditional Chinese). Read it before designing anything — it records measurements and rejected alternatives, not just intentions. Section numbers referenced below point into it.
+- Display name: **Markdown Ebook Review — Human–AI Writing**
+- Package name: `markdown-ebook-review-human-ai-writing`
+- VS Code extension ID: `raxwade.markdown-ebook-review-human-ai-writing`
+- Repository: `https://github.com/Raxwade/markdown-ebook-review-human-ai-writing`
+- Stable command and setting namespace: `mdepub.*`
 
-## Status
+The extension helps authors review Markdown manuscripts as real ebooks without
+exporting an EPUB after every edit. It renders the active manuscript with
+foliate-js in a VS Code side panel, supports search, bookmarks, highlights, and
+notes, and writes review notes to `<book>.md.notes.json`.
 
-All four milestones are implemented and the `.vsix` is installed in Remote-WSL.
+The JSON sidecar is the human-to-AI handoff: an author reviews the rendered book,
+records source-linked revision instructions, and gives the Markdown and sidecar
+to an AI assistant for the next revision. The extension does not call an AI
+provider, upload the manuscript, or revise the source automatically.
 
-The panel has now been opened in a real VSCode window, so **`asWebviewUri` across the WSL/Windows seam (§7.3) is confirmed** — the book renders. What that session found instead was that editing the markdown changed nothing on screen and the page buttons did nothing: `view.open()` appends a renderer per rebuild and leaves the stale one covering the frame. Fixed, with `spike/rebuild-loop.mjs` as the standing check. See §9.
+`docs/architecture.md` is the technical spec of record. Read the relevant
+section before changing rendering, packaging, webview, annotation, rebuild, or
+reader-state behavior; it records measured constraints and rejected approaches.
 
-0.4.0 then shipped a blank frame: making the frame an iframe meant its contents had to be *fetched*, and a webview's service worker cannot serve a `srcdoc` document. Fixed by bundling and injecting — see the invariant below, which is the sharpest example of the spike and the product disagreeing.
+## Current capabilities
+
+- Live real-EPUB preview for any open Markdown file.
+- Automatic full-book rebuilds that preserve reading location.
+- Phone, tablet, e-reader, desktop, panel, and custom viewports.
+- Reader appearance controls, whole-book search, bookmarks, progress, and
+  navigation history.
+- Highlights and structured notes stored outside the Markdown source.
+- Standards-based EPUB export with frontmatter, images, covers, custom CSS, and
+  configurable chapter splitting.
+- English source/fallback UI and Traditional Chinese localization.
 
 ## Commands
 
-| | |
+| Command | Purpose |
 |---|---|
-| `npm test` | `tsc -p .` then `node --test out/test/` — the whole suite |
-| `npm run compile` | type-check and emit to `out/` |
-| `npm run bundle` | esbuild → `media/stage.bundle.js` **and** `dist/extension.js` (what `main` points at) |
-| `npm run bundle:stage` | just the device frame's bundle; `spike` runs it too, so the harness never serves a stale one |
-| `npm run package` | bundle + `vsce package` → `.vsix` |
-| `npm run spike` | M0 harness on `http://127.0.0.1:7331` |
+| `npm test` | Type-check and run the complete Node test suite. |
+| `npm run compile` | Type-check and emit JavaScript to `out/`. |
+| `npm run bundle` | Build `media/stage.bundle.js` and `dist/extension.js`. |
+| `npm run bundle:stage` | Rebuild only the injected foliate stage. |
+| `npm run package` | Bundle and create the installable VSIX. |
+| `npm run spike` | Build the base fixture and start the browser harness on port 7331. |
+| `npm run spike:fixture` | Generate the base EPUB fixture. |
+| `npm run spike:reader` | Generate the automated reader-experience fixture. |
+| `npm run spike:notes` | Generate the manual annotation-loop fixture and console checks. |
+| `npm run spike:rebuild` | Generate the manual live-rebuild fixtures and console checks. |
 
-To run one test file: `npm run compile && node --test out/test/split.test.js`.
+Compile before running a generated fixture directly. To run one test file:
 
-**The spike doubles as the acceptance check for exported EPUBs.** `node spike/export-sample.mjs [file.md]` writes `spike/exported.epub`, then `http://127.0.0.1:7331/?epub=exported.epub` loads it through foliate-js — the same engine desktop Foliate uses. That is how §9's "openable in Foliate/Thorium" gets verified here.
+```bash
+npm run compile
+node --test out/test/split.test.js
+```
 
-**And as the only check on the marking loop.** `npm run spike:notes` writes `spike/notes.epub` and prints a console snippet for `http://127.0.0.1:7331/preview.html`. It plays mark → delete → delete again → delete the sidecar, and counts `view.renderer.getContents()[0].overlayer.element.children` — one child per drawn mark, and the only handle through the closed shadow roots. `npm test` cannot see any of it. The fifteen assertions are in the file's header — assertion 0 is the §6.1 invariant and assertion 1b the palette, and both are worth re-running with the window shrunk, since they are the two that only fail below 100% zoom. Assertion 9 posts its `notes` message by hand instead of through the snippet's `echo()`, which forces every note to `status: 'ok'` at its own `startLine` — the one shape that cannot show a line/block mismatch.
+## Architecture constraints
 
-**And as the only check on the rebuild loop.** `npm run spike:rebuild` writes three books — two different ones and one that is book 1 with a word changed. Posting them at `http://127.0.0.1:7331/preview.html` is how "an edit actually re-renders, in place" gets verified, because `npm test` cannot see it from either side. The procedure and the four assertions are in `spike/rebuild-loop.mjs`'s header; it is a paste-in snippet, not an automated test — there is no `playwright` dependency here. `view.renderer.parentNode.children.length` is the one usable handle through the closed shadow root and must stay 1 however many rebuilds you post. Use the *edited* book, not the other one, to check CFI restore: a swap between two different books cannot tell restore from reset.
+### EPUB build boundary
 
-## Architecture invariants
+- `src/epub/*` must not import `vscode` or access the filesystem. It accepts
+  strings and bytes; `extension.ts` owns I/O and supplies assets through
+  `readAsset`.
+- Rebuild the complete preview after each edit. Incremental rendering was
+  measured and rejected; do not add its complexity without new evidence.
+- Preserve the current CFI across rebuilds. Serialize overlapping opens and
+  close the previous foliate book before opening the next one.
+- Keep the unused per-chapter content hashes returned by `build()`. They reserve
+  the documented optimization path.
+- Preview ZIPs use STORE; exported ZIPs use DEFLATE. EPUB `mimetype` must remain
+  the first entry and uncompressed. `test/zip.test.ts` protects this invariant.
+- Metadata precedence is frontmatter, VS Code settings, the first `#` heading,
+  then filename.
+- A derived EPUB identifier must remain stable across edits and include the
+  workspace-relative source identity. Do not derive it from manuscript text.
+- `mdepub.css` trust depends on configuration scope: workspace values stay
+  inside the workspace, while user-scoped values may point elsewhere.
 
-- **`src/epub/*` must never `import 'vscode'` and must never touch `fs`.** String/buffer in, string/buffer out. Asset bytes arrive through `build()`'s `readAsset` callback; `extension.ts` owns all I/O. This is what keeps the error-prone half (chapter splitting, path resolution, XHTML escaping) testable headlessly.
-- **Full rebuild on every edit. Incremental was measured and rejected** (26 ms / 101 ms for the two reference manuscripts).
-- **`build()` returns per-chapter content hashes that nothing consumes.** They reserve the §4.3 optimisation. Not dead code — do not delete.
-- **Preview zips at level 0 (STORE), export at level 6 (DEFLATE).** §2.3.
-- **`mimetype` must be the archive's first entry and STORED.** This relies on fflate preserving object key insertion order — an undocumented dependency, so `test/zip.test.ts` asserts on the raw bytes.
-- **CFI restore after every rebuild is mandatory.** Without it every keystroke jumps to the cover.
-- **Metadata precedence:** frontmatter > VSCode settings > first `#` heading > filename.
-- **`identifier` is frontmatter-or-derived, and the derived form is keyed on the source path**, not on metadata alone — two `index.md` files with the same heading and no author hash identically otherwise, and two books sharing a `dc:identifier` make a reader library merge their reading positions. It must *not* include the text: an identifier that moved on every keystroke would defeat the purpose. `extension.ts` supplies `sourcePath` — workspace-folder name + relative path, `/` separators, so two clones agree. The folder name is not decoration: without it a multi-root workspace reduces `project-alpha/index.md` and `project-beta/index.md` both to `index.md`. `src/epub/` never learns where the file is from anything else.
-- **Titles are plain-texted, bodies are not.** `dc:title`, the nav document, the NCX and each chapter's `<title>` are plain-text slots, so `# My *great* [book](…)` has to go through `plainText()` first. Undoing markdown-it's HTML escaping is part of that — skip it and `&` reaches the reader as `&amp;`.
-- **`mdepub.css` is trusted by scope, not by path.** A workspace-scoped value arrives with someone else's repo, so it is confined to the workspace; a user-scoped one is the user's own, so `~/mystyles.css` and other paths outside the project work. `extension.ts` discriminates with `config.inspect()`, and expands `~` itself — Node does not.
-- **foliate-js is vendored into `media/vendor/`**, loaded by the webview via `localResourceRoots`, not from `node_modules`.
-- **`dist/` being in `.gitignore` does not affect packaging.** When a `.vscodeignore` exists, vsce reads it *instead of* `.gitignore`, and this repo has one. `npm run package` from a clean tree produces a 24-file `.vsix` with `extension/dist/extension.js` inside; verify with `rm -rf dist *.vsix && npm run package` before believing otherwise. Three separate reviews have reported this as a P1 blocker and it has been false every time.
-- **Custom properties do not cross a document boundary, and the highlight is drawn in the frame's document.** So the palette is `media/marks.css`, loaded by both — `@import` from `reader.css`, `<link>` in the stage srcdoc. With it in `reader.css` alone every mark painted black at the .3 fallback while the fill attribute still read back a correct `var(--mark-yellow)`, which is why nine spike assertions passed over it. Assert computed style, not attributes.
-- **The device frame is an `<iframe>`, and that is load-bearing.** The paginator sizes its columns from `#container.getBoundingClientRect()` (`paginator.js:700`), which reports the *transformed* size — so with the frame as a scaled `<div>`, a 56%-zoomed iPhone paginated the book 204px wide inside a 393px layout box. Inside an iframe that rect is relative to the iframe's own viewport and the transform cannot reach it: 393 either way, and 366 for the book at every zoom. §6.1. Do not put a border on `#frame`: with `border-box` a 1px border makes the viewport 391×850 and the declared size stops being the declared size.
-- **Nothing inside the device frame may load a URL, and the spike cannot catch a violation.** VSCode serves webview resources through a service worker that resolves *which* webview is asking from the client URL's `?id=` (`service-worker.js:677`); a srcdoc document is `about:srcdoc`, has no query, and every request from it 404s with "Could not resolve webview id". This bit the frame's own `<script>` *and* foliate's dynamic imports — `zip.js`, `epub.js`, `paginator.js` are fetched from inside the frame when a book opens. So the frame's whole graph is bundled (`npm run bundle:stage` → `media/stage.bundle.js`) and injected as text by `reader.js`, which is a client the worker can resolve. A plain HTTP server has no service worker and serves whoever asks, so **the spike passes on code that cannot work in the product** — this is the one thing only a real window checks. The service worker is readable on disk if it needs re-checking: `<vscode>/resources/app/out/vs/workbench/contrib/webview/browser/pre/service-worker.js` (on the *client* machine — for Remote-WSL it is under `/mnt/c/…`, not in `~/.vscode-server`).
-- **The injected script is inline, so it needs the page's nonce** — the frame inherits the parent's CSP, nonce and all. `pageNonce()` reads it off our own `<script>` (the IDL property survives; the content attribute is blanked on insertion).
-- **`media/vendor/` still ships even though only the bundle is loaded.** It is dead weight in the `.vsix`, deliberately: the spike serves the repo tree, so a shipped tree that differs from it stops being representative — which is exactly how the bug above shipped.
-- **foliate lives in the frame's own realm** (`media/stage.js`), because custom elements register per document. `srcdoc` keeps it same-origin, so `reader.js` reaches into `contentDocument` and the notes engine needed no message protocol. Anything foliate will `instanceof` — `Blob`, `File` — must be built from the frame's constructors; `zip.js` checks them and a cross-realm one fails silently. Same for `Overlayer`, whose `createSVGElement` closes over its module realm's document.
-- **A range measures itself against its own document's viewport.** The book sits in an iframe of foliate's, inset within the frame by the page margin, so a selection rect must be translated through `frameElement.getBoundingClientRect()` before the mark bar can use it — `rectInFrame()`. Skipping that put the bar 11px sideways and 47px high at 82% zoom, and the error grows with the scale.
+### Webview and reader
 
-## Things M0 proved that are easy to undo
+- The device frame must remain an `<iframe>` with no border. Its independent
+  viewport prevents visual scaling from changing foliate pagination.
+- Code inside the `srcdoc` frame cannot fetch its module graph in a VS Code
+  webview. Bundle `media/stage.js` and its foliate dependencies into
+  `media/stage.bundle.js`, then inject the bundle with the page nonce.
+- CSP must allow `blob:` styles for EPUB stylesheets. Do not weaken other CSP
+  boundaries without a concrete requirement.
+- Create `Blob`, `File`, and overlay values from the frame's realm when foliate
+  performs `instanceof` checks. Custom elements and overlay helpers are also
+  document-realm specific.
+- Keep foliate-js vendored under `media/vendor/`; the browser harness and shipped
+  extension must exercise the same reader sources.
+- Device, orientation, and appearance changes resize or repaginate the existing
+  renderer; they must not rebuild the EPUB.
 
-- **CSP must include `blob:` in `style-src`.** Otherwise foliate-js's stylesheets are refused and the book renders completely unstyled — no thrown error, just a console message. Working CSP is in §7.1.
-- **The device frame must set `overflow: hidden`.** `<foliate-view>` ships no `:host` styles and lays out at 2× its container, so an unclipped frame grows a scrollbar and stops being a fixed viewport (§6.1).
-- **All three of foliate-js's shadow roots are `mode: 'closed'`.** Rendering cannot be verified through the DOM — only visually. Two M1 bugs were caught by screenshot after unit tests passed.
-- **Switching device must not rebuild** — resize, repaginate, restore CFI, all inside the webview (§4.4).
-- **A note only has a CFI once its section has been rendered**, because `drawSection` is what assigns it. So the note list cannot navigate by CFI alone — for a book of any size most notes are in sections foliate has never loaded, and clicking them fell through to the editor. `build()` reports `chapterStartLines` and the host sends it with every book; the panel maps the note's line to a chapter and goes there *first*, waits for the draw, then jumps to the CFI. `redrawAll()` returns the draw chain for exactly that wait — `goTo` resolving means the renderer moved, not that anything has been drawn.
-- **The chapter href comes from the TOC, not from the manifest.** `chapterStartLines[i]` indexes `el.toc.__items[i]` — same order, one entry each — so navigation reuses the string the chapter dropdown already works with rather than guessing how foliate wants a path spelled.
-- **Selection is held by note id, and drawn.** A CFI is regenerated on every rebuild, so a selection keyed on one would not survive a keystroke. The selected note draws through `drawSelected`, which calls the frame's `Overlayer.highlight` and adds a stroke to the group it returns — it constructs no SVG itself, because `createSVGElement` closes over its own realm's document. The edge colour is a literal, not a `var()`: a custom property that failed to arrive computes to black, which is what this draws, so a var would make its own failure invisible.
-- **A quote is rendered text; the document is markdown source. They are never the same string.** `anchorNote` compares them through `matchable()`, which strips whitespace, link targets and the syntax markdown-it eats. Matching the raw line worked for years only because most marks sit *inside* a pair of syntax (`**bold**` → `bold` is still a substring). It breaks the moment the removed syntax sits *between* two pieces of the marked text: the `|` between table cells is the everyday case, and a mark across one row reported 找不到原句 with its highlight sitting right there. A character strip, not a real render — this runs per note per line per rebuild, and `plainText()` at that rate was measured off the table. Looser matching is the price; the nearest-match rule keeps it honest, and `test/notes.test.ts` pins that a quote which is genuinely gone still goes stale.
-- **A stale note paints nothing** (`anchorInDocument` returns null for it), so a highlight visible next to a 找不到原句 row is *not* ours — an unfocused browser selection greys out rather than disappearing, and the two look identical in a screenshot. Assertion 13 pins it.
-- **`data-md-line` is a span, not a key.** A block routinely covers many source lines — a fenced code block, a hard-wrapped paragraph — so `render.ts` stamps `data-md-line-end` too and the webview looks a line up by *containment*, taking the last match in document order because that is the innermost block and the one `blockOf` measured columns against. Looking it up with `querySelector('[data-md-line="N"]')` was wrong for every mark not on its block's first line: the note saved, the panel listed it as healthy, and the book drew nothing. The two halves disagree by construction — the webview records the *block's* line, while `src/notes.ts` re-anchors by searching for the quote and returns the line the *text* is on. Assertion 9 in `spike/notes-loop.mjs` is the standing check, and it has to mark a line that is not the block's first or it passes against the bug.
-- **The sidecar's `range` is looser than §10.1 reads.** For a multi-line block it is `{block-start line, block-relative column}`, so an agent reading `{startLine: 89, startCol: 47}` cannot resolve it against the `.md` without re-deriving the block structure. Known, not fixed; do not write spec prose claiming the bridge round-trips cleanly.
-- **Notes anchor twice, and only one of them persists** (§10.1). The CFI is what foliate draws from and is regenerated on every render; the `.md` line/column range is what goes in the sidecar and what an agent resolves. `data-md-line` is the bridge, and it is stamped in preview builds only.
-- **Highlights must be drawn on `create-overlay`, never on `load`.** The paginator dispatches `create-overlayer` *after* `await view.load()`, so on `load` the overlayer does not exist yet and `addAnnotation()` silently paints nothing (§10.6).
-- **`view.open()` appends a renderer and never removes the old one.** Every rebuild must `close()` the previous book first, or the stale render sits in the frame while `view.renderer` — what the page buttons drive — points at the one clipped below it. Nothing throws and nothing logs; it just stops responding.
-- **Opens must be serialized.** `openBook()` awaits three times, so without a chain an older rebuild can land after a newer one, or tear down a renderer another open is still building.
-- **A redraw must remove, not just add.** `addAnnotation()` clears only the drawing already sitting under the *same* value string, so a note that was deleted, went stale, or moved to a different CFI stays painted until the document is torn down. `drawSection()` therefore tracks the values it drew per section and deletes old-minus-new. Deleting a note used to leave its highlight behind, and clicking that ghost hit-tested to a value no note carried — so the editor stopped opening, which reads as "I can't delete another one". `spike/notes-loop.mjs` is the standing check.
-- **A note gets exactly one CFI, and it comes from `anchorInDocument()`.** Drawing straight from the live selection gives a *second* key for the same note — the reconstruction from stored line/columns cannot reproduce a boundary that sat on a text-node edge, and it deliberately clamps a cross-block mark to the first block. Two keys means two drawings and only one of them removable. `markSelection()` saves and lets the redraw path assign the CFI.
-- **A selection boundary is not always a text node.** Triple-click and select-all hand back the element with `offset` counting child *nodes*, so `columnIn()` measures with a range instead of walking for an identity match. Walking falls through to the block's full length, making `startCol === endCol` — a note that saves fine and is never drawn.
+### Notes and annotations
+
+- Never modify the Markdown source when highlighting or taking notes. The
+  sidecar is a portable data contract and must remain understandable without the
+  extension.
+- Draw annotations on `create-overlay`, not `load`; the overlayer does not exist
+  earlier.
+- Load `media/marks.css` in both documents because CSS custom properties do not
+  cross the iframe boundary. Assert computed styles rather than SVG attributes.
+- A note receives exactly one CFI, derived by `anchorInDocument()`. Persist the
+  Markdown range and quote, not the transient CFI.
+- `data-md-line` describes a source span, not a unique key. Multi-line blocks
+  require containment lookup using `data-md-line-end`.
+- The sidecar range for a multi-line block can use the block's start line and a
+  block-relative column. AI consumers should use `range` together with `quote`;
+  do not claim that coordinates alone always round-trip exactly.
+- Redraws must remove obsolete drawings as well as add current ones. Deleted,
+  stale, or relocated notes must not leave ghost highlights.
+
+### Compatibility and localization
+
+- Keep `mdepub.*` command IDs, settings, storage keys, and sidecar schema stable
+  unless a migration is implemented and documented.
+- English is the source and fallback interface language. Update
+  `package.nls.json`, `package.nls.zh-tw.json`, and the runtime catalogs together
+  whenever user-visible text changes.
+
+## Verification expectations
+
+For routine changes:
+
+```bash
+npm test
+npm run package
+```
+
+For reader, pagination, search, bookmark, appearance, annotation, or rebuild
+changes, also run the relevant browser fixture. The browser harness cannot
+reproduce the VS Code webview service-worker boundary, so install and open a
+packaged VSIX in a real VS Code window after changing CSP, resource loading,
+iframe construction, or stage bundling.
+
+Use `npx vsce ls --no-dependencies` to inspect package contents. Verify required
+artifacts such as `dist/extension.js`, localization bundles, and reader assets;
+do not rely on a fixed file count. Do not commit `dist/`, `out/`, VSIX files,
+generated EPUBs, logs, note sidecars, private manuscripts, or credentials.
 
 ## Out of scope
 
-No pandoc/calibre. No mobi/KF8. No editing existing `.epub`. No in-tool EPUBCheck validation.
+- Pandoc or calibre dependencies
+- MOBI or Kindle KF8 conversion
+- Editing existing EPUB files
+- Built-in EPUBCheck validation
+- An embedded AI provider or automatic manuscript revision
