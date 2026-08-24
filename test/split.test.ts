@@ -7,6 +7,30 @@ test('splits at ## when splitLevel is 2', () => {
     assert.deepEqual(chapters.map(c => c.title), ['Book', 'One', 'Two'])
 })
 
+test('author-friendly headings without a separating space still split', () => {
+    const chapters = splitChapters('#Book\n\nintro\n\n##One\n\na\n\n##第二章\n\nb\n', 2)
+    assert.deepEqual(chapters.map(c => c.title), ['Book', 'One', '第二章'])
+    assert.deepEqual(chapters.map(c => c.startLine), [0, 4, 8])
+    // Chapter source stays unchanged; compatibility rendering must not corrupt
+    // the coordinates recorded in note sidecars.
+    assert.equal(chapters[1]!.markdown.split('\n')[0], '##One')
+})
+
+test('Setext level-one and level-two headings split like ATX headings', () => {
+    const source = 'Book\n====\n\nintro\n\nChapter\n-------\n\nbody\n'
+    const chapters = splitChapters(source, 2)
+    assert.deepEqual(chapters.map(c => c.title), ['Book', 'Chapter'])
+    assert.deepEqual(chapters.map(c => c.level), [1, 2])
+    assert.deepEqual(chapters.map(c => c.startLine), [0, 5])
+})
+
+test('splitLevel 1 keeps a Setext level-two heading in its parent chapter', () => {
+    const source = 'Book\n====\n\nChapter\n-------\n\nbody\n'
+    const chapters = splitChapters(source, 1)
+    assert.deepEqual(chapters.map(c => c.title), ['Book'])
+    assert.match(chapters[0]!.markdown, /Chapter\n-------/)
+})
+
 test('splitLevel 1 keeps ## inside its parent chapter', () => {
     const chapters = splitChapters('# One\n\n## Sub\n\na\n\n# Two\n\nb\n', 1)
     assert.deepEqual(chapters.map(c => c.title), ['One', 'Two'])
@@ -53,6 +77,11 @@ test('headings inside fenced code do not split', () => {
     ].join('\n')
     const chapters = splitChapters(src, 2)
     assert.deepEqual(chapters.map(c => c.title), ['Real', 'Also real'])
+})
+
+test('author-friendly headings inside fenced code do not split', () => {
+    const src = '#Book\n\n```markdown\n##Not a chapter\n```\n\n##Real\n'
+    assert.deepEqual(splitChapters(src, 2).map(c => c.title), ['Book', 'Real'])
 })
 
 test('an inner ``` does not close a ```` block', () => {

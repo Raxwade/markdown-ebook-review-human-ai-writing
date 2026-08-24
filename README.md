@@ -154,6 +154,12 @@ For technical documents with one `#` title and many `##` sections, use `mdepub.s
 
 Choose `Fit current panel` in the device menu when you explicitly want pagination based on the current panel rather than a device preset.
 
+## Markdown compatibility
+
+The preview and exported EPUB follow the same documented compatibility profile: safe CommonMark, all four user-visible GFM extensions, and author-friendly corrections for frequent human/AI drafting mistakes. See the normative [Markdown Compatibility Specification](docs/markdown-compatibility.md) for the complete 27-family matrix, examples, HTML policy, and explicit non-goals.
+
+Raw HTML such as `<img>` or `<a href="…">` is escaped rather than executed. Use Markdown images (`![alt](path)`) and links (`[label](url)`). `<href>` is not a valid tag. The renderer accepts `##Heading` as `## Heading` and padded strong markers; these corrections never run inside code and do not change source line counts.
+
 ## Device viewport
 
 The viewport fixes both width and height in logical CSS pixels. Pagination depends on both dimensions; resizing only the width would produce page breaks that match no real device.

@@ -1,4 +1,4 @@
-# Only dist/ + media/ ship. src/ is bundled into dist/extension.js.
+# Source is bundled into dist/extension.js; ship only user-facing documentation.
 .vscode/**
 .github/**
 .claude/**
@@ -9,6 +9,7 @@ src/**
 test/**
 spike/**
 docs/**
+!docs/markdown-compatibility.md
 .playwright-mcp/**
 **/*.ts
 **/*.map

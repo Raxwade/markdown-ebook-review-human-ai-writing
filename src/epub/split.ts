@@ -1,5 +1,6 @@
 // Split markdown into chapters by heading level (spec §6, `splitLevel`).
-import { makeFenceTracker, normalizeNewlines } from './text'
+import { normalizeNewlines } from './text'
+import { parseMarkdownHeadings } from './markdown'
 
 export interface Chapter {
     /** Heading text, or '' for content that precedes the first heading. */
@@ -19,24 +20,15 @@ export interface Chapter {
 }
 
 /**
- * ATX heading, per CommonMark:
- *   - up to three leading spaces still count (four make it an indented code
- *     block, so ` {0,3}` is the whole rule, not a nicety — an editor that
- *     indents a heading by two spaces was silently losing the chapter break);
- *   - the text is optional, so a bare `#` line is an empty heading;
- *   - a trailing run of `#` closes the heading only when a space precedes it,
- *     which is what keeps `## C#` from being read as `## C`.
- */
-const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/
-
-/**
- * Chapters break at any ATX heading of depth <= splitLevel. Text before the
+ * Chapters break at any ATX or Setext heading of depth <= splitLevel. Text before the
  * first such heading becomes its own chapter so nothing is silently dropped;
  * a document with no headings comes back as a single chapter.
  */
 export function splitChapters(markdown: string, splitLevel: 1 | 2): Chapter[] {
     const lines = normalizeNewlines(markdown).split('\n')
-    const inFence = makeFenceTracker()
+    const headings = new Map(parseMarkdownHeadings(markdown)
+        .filter(heading => heading.level <= splitLevel)
+        .map(heading => [heading.startLine, heading]))
 
     const chapters: Chapter[] = []
     let current: Chapter = { title: '', level: 0, markdown: '', startLine: 0 }
@@ -58,14 +50,10 @@ export function splitChapters(markdown: string, splitLevel: 1 | 2): Chapter[] {
     }
 
     lines.forEach((line, i) => {
-        // Fence state must advance for every line, including heading-looking ones.
-        if (inFence(line)) { buffer.push(line); return }
-
-        const m = HEADING.exec(line)
-        if (m && m[1]!.length <= splitLevel) {
+        const heading = headings.get(i)
+        if (heading) {
             flush(i)
-            // m[2] is absent for a bare `#`; that is an empty title, not a crash.
-            current = { title: (m[2] ?? '').trim(), level: m[1]!.length, markdown: '', startLine: i }
+            current = { title: heading.title, level: heading.level, markdown: '', startLine: i }
             buffer.push(line)
             return
         }

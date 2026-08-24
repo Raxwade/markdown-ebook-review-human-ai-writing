@@ -102,6 +102,12 @@ async function run() {
 
   // Draw a real note before changing layout; its overlayer child must survive.
   const content = view.renderer.getContents()[0]
+  check('GFM task list reaches the real reader',
+    content.doc.querySelector('.task-list-marker[role="checkbox"][aria-checked="true"]')?.textContent === '☒')
+  check('GFM single-tilde strike reaches the real reader',
+    content.doc.querySelector('del')?.textContent === 'Grammar reviewed')
+  check('GFM extended autolink reaches the real reader',
+    content.doc.querySelector('a[href="http://www.example.com"]')?.textContent === 'www.example.com')
   const textNode = [...content.doc.querySelectorAll('[data-md-line]')]
     .map(node => node.firstChild).find(node => node?.nodeType === 3 && node.textContent.trim().length > 10)
   if (textNode) {
@@ -133,6 +139,35 @@ async function run() {
   } else {
     check('image click opens note editor', false, 'fixture image missing')
     check('image note preserves Markdown target', false, 'fixture image missing')
+  }
+
+  // Simulate an AI edit that kept the quote on the host-reported line but
+  // changed everything before it. Persisted columns deliberately point at the
+  // first table cell; the highlight must be rebuilt around the quote instead.
+  post({ type: 'notes', warnings: [], path: 'fixture.notes.json', notes: [] })
+  await wait(250)
+  const table = content.doc.querySelector('table[data-md-line]')
+  const targetCell = table?.querySelector('tbody tr td:last-child')
+  if (table && targetCell) {
+    const line = Number(table.getAttribute('data-md-line')) + 2
+    const quote = targetCell.textContent.trim()
+    post({ type: 'notes', warnings: [], path: 'fixture.notes.json', notes: [{
+      id: 'shifted-columns', color: 'yellow', chapter: view.lastLocation?.tocItem?.label ?? '',
+      range: { startLine: line, startCol: 0, endLine: line, endCol: 6 },
+      quote, note: '', created: new Date().toISOString(), status: 'moved', line,
+    }] })
+    await wait(300)
+    const overlayRect = content.overlayer?.element.querySelector('g rect')
+    const targetRect = targetCell.getBoundingClientRect()
+    const x = Number(overlayRect?.getAttribute('x'))
+    const y = Number(overlayRect?.getAttribute('y'))
+    check('revised note ignores stale columns and highlights its quote',
+      Number.isFinite(x) && Number.isFinite(y)
+        && x >= targetRect.left - 1 && x < targetRect.right
+        && y >= targetRect.top - 1 && y < targetRect.bottom,
+      `overlay ${x},${y}; target ${targetRect.left},${targetRect.top}`)
+  } else {
+    check('revised note ignores stale columns and highlights its quote', false, 'fixture table missing')
   }
   const marksBefore = view.renderer.getContents()[0].overlayer?.element.children.length ?? 0
   check('annotation fixture drawn', marksBefore > 0, marksBefore)

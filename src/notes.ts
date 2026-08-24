@@ -4,6 +4,8 @@
 // That matters more here than elsewhere — this file is a contract with whatever
 // reads it next (a person, Claude, Codex), so its shape has to be verifiable
 // without a filesystem or an editor in the loop.
+import { normalizeNewlines } from './epub/text'
+import { parseMarkdownHeadings, type MarkdownHeading } from './epub/markdown'
 
 /** Highlight colours, mirroring what a phone e-reader offers. */
 export const COLORS = ['yellow', 'green', 'blue', 'pink', 'purple'] as const
@@ -28,7 +30,7 @@ export interface ImageTarget {
 export interface Note {
     id: string
     color: Color
-    /** Chapter title at the time of marking; for reading, not for anchoring. */
+    /** Chapter title at marking time; also constrains duplicate-quote matching. */
     chapter: string
     range: NoteRange
     /** Present for an image annotation; absent for a text selection. */
@@ -292,19 +294,54 @@ const SYNTAX = /[\s`*_~|[\]()!\\]+/g
 const matchable = (s: string): string => s.replace(LINK_TARGET, ']').replace(SYNTAX, '')
 
 /**
+ * Find the current line span of the chapter recorded with a note.
+ *
+ * A short phrase can occur throughout a book. If AI removes the original but
+ * leaves the same words in a later chapter, a nearest-match search over the
+ * entire manuscript silently attaches the review to unrelated prose. When the
+ * original heading still exists, it is a hard scope: no match inside means the
+ * note is stale. If no heading matches, retain the legacy whole-book behavior
+ * for preamble notes and sidecars whose chapter label predates the current TOC.
+ */
+function chapterScope(
+    note: Note,
+    headings: MarkdownHeading[],
+    lines: string[],
+): { start: number; end: number } | null {
+    const wanted = matchable(note.chapter)
+    if (!wanted) return null
+
+    const matching = headings.filter(heading => matchable(heading.title) === wanted)
+    if (!matching.length) return null
+    const selected = matching.reduce((best, candidate) =>
+        Math.abs(candidate.startLine - note.range.startLine)
+            < Math.abs(best.startLine - note.range.startLine)
+            ? candidate : best)
+    const position = headings.indexOf(selected)
+    const next = headings.slice(position + 1).find(heading => heading.level <= selected.level)
+    return { start: selected.startLine, end: next?.startLine ?? lines.length }
+}
+
+/**
  * Find where a note's text sits in the current document.
  *
  * Editing above a mark shifts it, so the recorded line is a hint rather than an
- * answer: the search starts there and widens outwards, which keeps the common
- * case (a small edit nearby) at the top of the loop and makes the wrong-but-
+ * answer: the search starts there and widens outwards within the recorded
+ * chapter, which keeps the common case (a small edit nearby) at the top of the
+ * loop and makes the wrong-but-
  * identical-text case pick the closest one.
  *
  * A mark whose text is gone is reported 'stale' rather than dropped — the user
  * asked to keep those and flag them, because the comment is the part worth
  * money and losing it to an unrelated edit is the worse failure.
  */
-export function anchorNote(note: Note, markdown: string): Anchored {
-    const lines = markdown.split('\n')
+function anchorNoteWithContext(
+    note: Note,
+    markdown: string,
+    lines: string[],
+    headings: MarkdownHeading[],
+): Anchored {
+    const scope = chapterScope(note, headings, lines) ?? { start: 0, end: lines.length }
 
     if (note.target?.type === 'image') {
         const sourceMatches: number[] = []
@@ -319,6 +356,7 @@ export function anchorNote(note: Note, markdown: string): Anchored {
             const src = match[2] ?? match[3] ?? ''
             const before = markdown.slice(0, match.index)
             const line = (before.match(/\n/g) ?? []).length
+            if (line < scope.start || line >= scope.end) continue
             if (src === note.target.src) sourceMatches.push(line)
             else if (note.target.alt && alt === note.target.alt) altMatches.push(line)
         }
@@ -345,7 +383,8 @@ export function anchorNote(note: Note, markdown: string): Anchored {
     const nth = new Map<number, number>()
     norm.forEach((s, i) => { if (s) nth.set(i, content.push(i) - 1) })
 
-    const at = (i: number): boolean => i >= 0 && i < lines.length && norm[i]!.includes(needle)
+    const at = (i: number): boolean =>
+        i >= scope.start && i < scope.end && norm[i]!.includes(needle)
 
     /**
      * Does the quote start on line `i`, possibly running past the end of it?
@@ -358,7 +397,7 @@ export function anchorNote(note: Note, markdown: string): Anchored {
      * found from the line it starts on.
      */
     const spanAt = (i: number): boolean => {
-        if (i < 0 || i >= lines.length) return false
+        if (i < scope.start || i >= scope.end) return false
         const first = norm[i]!
         if (!first) return false                       // nothing starts on an empty one
         // How far the window is worth growing. A match this test accepts begins
@@ -371,7 +410,7 @@ export function anchorNote(note: Note, markdown: string): Anchored {
         const enough = first.length + needle.length
         let window = first
         let k = nth.get(i)! + 1
-        while (k < content.length && window.length < enough) {
+        while (k < content.length && content[k]! < scope.end && window.length < enough) {
             window += norm[content[k]!]!
             k++
             const found = window.indexOf(needle)
@@ -418,5 +457,19 @@ export function anchorNote(note: Note, markdown: string): Anchored {
     return { note, status: 'stale', line: note.range.startLine }
 }
 
-export const anchorAll = (notes: Note[], markdown: string): Anchored[] =>
-    notes.map(n => anchorNote(n, markdown))
+export function anchorNote(note: Note, markdown: string): Anchored {
+    const normalized = normalizeNewlines(markdown)
+    return anchorNoteWithContext(
+        note,
+        normalized,
+        normalized.split('\n'),
+        parseMarkdownHeadings(normalized),
+    )
+}
+
+export function anchorAll(notes: Note[], markdown: string): Anchored[] {
+    const normalized = normalizeNewlines(markdown)
+    const lines = normalized.split('\n')
+    const headings = parseMarkdownHeadings(normalized)
+    return notes.map(note => anchorNoteWithContext(note, normalized, lines, headings))
+}

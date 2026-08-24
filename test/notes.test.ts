@@ -325,6 +325,67 @@ test('looser matching does not resurrect a quote that is really gone', () => {
     assert.equal(a.status, 'stale')
 })
 
+test('a deleted quote does not jump to the same words in another chapter', () => {
+    const doc = [
+        '# Original chapter',
+        '',
+        'The reviewed sentence was rewritten completely.',
+        '',
+        '# Later chapter',
+        '',
+        'A table here happens to mention pencil lead.',
+    ].join('\n')
+    const a = anchorNote(noteAt({
+        chapter: 'Original chapter',
+        quote: 'pencil lead',
+        range: { startLine: 2, startCol: 4, endLine: 2, endCol: 15 },
+    }), doc)
+    assert.equal(a.status, 'stale')
+    assert.equal(a.line, 2)
+})
+
+test('a quote can still move within its original chapter', () => {
+    const doc = [
+        '# Original chapter',
+        '',
+        'New introductory paragraph.',
+        '',
+        'The sentence still contains pencil lead.',
+        '',
+        '# Later chapter',
+        '',
+        'Another pencil lead mention.',
+    ].join('\n')
+    const a = anchorNote(noteAt({
+        chapter: 'Original chapter',
+        quote: 'pencil lead',
+        range: { startLine: 2, startCol: 0, endLine: 2, endCol: 11 },
+    }), doc)
+    assert.equal(a.status, 'moved')
+    assert.equal(a.line, 4)
+})
+
+test('Setext chapter headings also prevent a quote from jumping chapters', () => {
+    const doc = [
+        'Original chapter',
+        '================',
+        '',
+        'The reviewed sentence was replaced.',
+        '',
+        'Later chapter',
+        '=============',
+        '',
+        'The later chapter still says pencil lead.',
+    ].join('\n')
+    const a = anchorNote(noteAt({
+        chapter: 'Original chapter',
+        quote: 'pencil lead',
+        range: { startLine: 3, startCol: 0, endLine: 3, endCol: 11 },
+    }), doc)
+    assert.equal(a.status, 'stale')
+    assert.equal(a.line, 3)
+})
+
 test('a table\'s delimiter row cannot claim a mark', () => {
     // `|---|---|` reduces to nothing once the syntax is stripped. A line that is
     // only syntax must not be a candidate, or the span search would start there.

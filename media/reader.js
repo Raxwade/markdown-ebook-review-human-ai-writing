@@ -1276,6 +1276,122 @@ function blockForLine(doc, line) {
     return found
 }
 
+// Mirrors src/notes.ts. Existing sidecars may contain the original localized
+// elision marker, while new files use the language-neutral form.
+const QUOTE_ELISION = /\s*(?:\[…\d+…\]|〔…\d+ 字…〕)\s*/
+const normalizeRendered = text => text.replace(/\s+/g, ' ').trim()
+
+/**
+ * Normalize a block's rendered text while retaining DOM offsets.
+ *
+ * `elideQuote()` collapses selection whitespace before persistence, whereas a
+ * table or hard-wrapped paragraph contains tabs/newlines in `textContent`.
+ * `starts` and `ends` map each normalized code unit back to its raw block offset
+ * so a quote match can become a DOM Range again.
+ */
+function indexRenderedText(nodes) {
+    let text = ''
+    const starts = []
+    const ends = []
+    let raw = 0
+    let pendingSpace = null
+
+    const emit = (char, start, end) => {
+        text += char
+        starts.push(start)
+        ends.push(end)
+    }
+
+    for (const node of nodes) {
+        const value = node.textContent ?? ''
+        for (let i = 0; i < value.length; i++, raw++) {
+            const char = value[i]
+            if (/\s/.test(char)) {
+                if (text && pendingSpace === null) pendingSpace = { start: raw, end: raw + 1 }
+                else if (pendingSpace) pendingSpace.end = raw + 1
+                continue
+            }
+            if (pendingSpace) {
+                emit(' ', pendingSpace.start, pendingSpace.end)
+                pendingSpace = null
+            }
+            emit(char, raw, raw + 1)
+        }
+    }
+    return { text, starts, ends }
+}
+
+/** All start offsets for `needle`, including repeated occurrences. */
+function occurrences(text, needle) {
+    const found = []
+    if (!needle) return found
+    for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) found.push(at)
+    return found
+}
+
+/**
+ * Rebuild a text range from the quote visible in the current EPUB.
+ *
+ * The source host can relocate a quote to another line, but persisted columns
+ * describe the old rendered block. Reusing them after a revision highlights an
+ * unrelated neighbor—especially in table rows. The quote is authoritative;
+ * the old start column only breaks ties when the same quote occurs twice in one
+ * block. Cross-block selections still draw through the end of their first block.
+ */
+function rangeForQuote(doc, nodes, note, locate, sameBlock) {
+    const indexed = indexRenderedText(nodes)
+    const parts = note.quote.split(QUOTE_ELISION)
+    const elided = parts.length === 2
+    const head = normalizeRendered(parts[0] ?? '')
+    const tail = elided ? normalizeRendered(parts[1] ?? '') : ''
+    if (!head) return null
+
+    let candidates = occurrences(indexed.text, head)
+    if (!candidates.length && !sameBlock) {
+        // A cross-block quote is not wholly present in its first block. Match a
+        // prefix instead, longest first, rather than falling back to stale
+        // columns that may now point at unrelated prose.
+        const minimum = Math.min(8, head.length)
+        for (let length = Math.min(32, head.length);
+            length >= minimum && !candidates.length; length--) {
+            candidates = occurrences(indexed.text, head.slice(0, length))
+        }
+    }
+    if (!candidates.length) return null
+
+    const starts = candidates
+        .map(index => ({ index, raw: indexed.starts[index] }))
+        .filter(candidate => candidate.raw != null)
+    if (!starts.length) return null
+    const chosen = starts.reduce((best, candidate) =>
+        Math.abs(candidate.raw - note.range.startCol) < Math.abs(best.raw - note.range.startCol)
+            ? candidate : best)
+
+    let normalizedEnd
+    if (!sameBlock) {
+        normalizedEnd = indexed.text.length
+    } else if (elided) {
+        const tailAt = indexed.text.indexOf(tail, chosen.index + head.length)
+        if (!tail || tailAt < 0) return null
+        normalizedEnd = tailAt + tail.length
+    } else {
+        normalizedEnd = chosen.index + head.length
+    }
+    const rawEnd = indexed.ends[normalizedEnd - 1]
+    if (rawEnd == null) return null
+
+    const [startNode, startOffset] = locate(chosen.raw)
+    const [endNode, endOffset] = locate(rawEnd)
+    const range = doc.createRange()
+    try {
+        range.setStart(startNode, startOffset)
+        range.setEnd(endNode, endOffset)
+    } catch {
+        return null
+    }
+    return range.collapsed ? null : range
+}
+
 /**
  * Re-derive each note's CFI from its `.md` range and draw it.
  *
@@ -1326,18 +1442,7 @@ function anchorInDocument(doc, index, note) {
     // A mark spanning blocks is clamped to the first one: the columns are
     // block-relative, so an end column from a later block is meaningless here.
     const sameBlock = (note.range.endLine ?? line) === note.range.startLine
-    const [startNode, startOffset] = locate(note.range.startCol)
-    const [endNode, endOffset] = sameBlock ? locate(note.range.endCol) : locate(total)
-
-    const range = doc.createRange()
-    try {
-        range.setStart(startNode, startOffset)
-        range.setEnd(endNode, endOffset)
-    } catch {
-        return null
-    }
-    if (range.collapsed) return null
-    return range
+    return rangeForQuote(doc, nodes, note, locate, sameBlock)
 }
 
 /**

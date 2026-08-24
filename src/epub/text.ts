@@ -73,3 +73,74 @@ export function makeFenceTracker(): (line: string) => boolean {
         return open !== null
     }
 }
+
+/**
+ * Markdown accepted as a convenience for manuscript authors.
+ *
+ * CommonMark intentionally requires whitespace after an ATX heading marker and
+ * forbids whitespace just inside a strong-emphasis delimiter. AI-written drafts
+ * nevertheless commonly contain `##Heading` and `** important **`. Treat those
+ * two forms as their unambiguous author intent, while leaving fenced and inline
+ * code byte-for-byte alone. The transform never adds or removes a newline, so
+ * markdown-it's token maps still address the source document's real lines.
+ */
+const normalizeStrongOutsideCode = (line: string): string => {
+    const normalize = (segment: string): string => segment.replace(
+        /(^|[^\p{L}\p{N}\\])(\*\*|__)[ \t]+(\S(?:.*?\S)?)[ \t]+\2(?=$|[^\p{L}\p{N}])/gu,
+        '$1$2$3$2',
+    )
+
+    let result = ''
+    let proseStart = 0
+    let index = 0
+    while (index < line.length) {
+        if (line[index] !== '`' || (index > 0 && line[index - 1] === '\\')) {
+            index++
+            continue
+        }
+        let runEnd = index + 1
+        while (line[runEnd] === '`') runEnd++
+        const marker = line.slice(index, runEnd)
+        let close = -1
+        let candidate = runEnd
+        while (candidate < line.length) {
+            if (line[candidate] !== '`') {
+                candidate++
+                continue
+            }
+            let candidateEnd = candidate + 1
+            while (line[candidateEnd] === '`') candidateEnd++
+            if (candidateEnd - candidate === marker.length) {
+                close = candidate
+                break
+            }
+            candidate = candidateEnd
+        }
+        if (close < 0) {
+            index = runEnd
+            continue
+        }
+        result += normalize(line.slice(proseStart, index))
+        result += line.slice(index, close + marker.length)
+        index = close + marker.length
+        proseStart = index
+    }
+    return result + normalize(line.slice(proseStart))
+}
+
+const normalizeAuthorLine = (line: string): string => {
+    // `(?!#)` prevents a run of seven or more hashes from backtracking into a
+    // six-hash heading. Up to three leading spaces remain the CommonMark limit.
+    const heading = /^( {0,3})(#{1,6})(?!#)(?=\S)(.*)$/u.exec(line)
+    const withHeadingSpace = heading
+        ? `${heading[1]}${heading[2]} ${heading[3]}`
+        : line
+    return normalizeStrongOutsideCode(withHeadingSpace)
+}
+
+export function normalizeAuthorMarkdown(markdown: string): string {
+    const inFence = makeFenceTracker()
+    return normalizeNewlines(markdown).split('\n')
+        .map(line => inFence(line) ? line : normalizeAuthorLine(line))
+        .join('\n')
+}

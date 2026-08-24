@@ -11,6 +11,10 @@ Notable project changes are recorded here. The format follows
 - Add image annotations with source-linked targets in the JSON notes sidecar.
 - Add archive, discard, and cancel handling for stale notes, including a
   user-selectable archive filename and bulk stale-note action.
+- Define a normative Markdown compatibility profile with regression coverage
+  for every CommonMark/GFM syntax family and the raw HTML exception.
+- Add static GFM task items, one-tilde strikethrough, extended autolinks, and
+  Setext heading chapter splits.
 
 ### Security
 
@@ -19,6 +23,8 @@ Notable project changes are recorded here. The format follows
 ### Changed
 
 - Open the note editor after every highlight color choice.
+- Re-anchor revised notes from their saved quote within the original chapter
+  instead of reusing stale rendered columns.
 - Rename the extension and package identity to **Markdown Ebook Review —
   Human–AI Writing** (`raxwade.markdown-ebook-review-human-ai-writing`) and
   describe its structured-note handoff for AI-assisted revision.

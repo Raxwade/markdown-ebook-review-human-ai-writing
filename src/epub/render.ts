@@ -1,19 +1,13 @@
 // markdown → XHTML (spec §3). Pure: string in, string out.
-import MarkdownIt from 'markdown-it'
-import { escapeXml, unescapeXml } from './text'
+import { escapeXml, normalizeAuthorMarkdown, unescapeXml } from './text'
+import { createMarkdown } from './markdown'
 
 // html:false is a correctness requirement, not a policy choice. One raw `<br>`
 // from the source would make the chapter non-well-formed, and a strict EPUB
 // reader rejects the whole document, not just the offending element.
 // markdown-it decodes named entities (&nbsp; &copy;) into literal characters,
 // so nothing outside the five XML built-ins survives into the output.
-const md = new MarkdownIt({
-    html: false,
-    xhtmlOut: true,
-    breaks: false,
-    linkify: true,
-    typographer: false,
-})
+const md = createMarkdown()
 
 export interface RenderOptions {
     lang: string
@@ -46,9 +40,7 @@ export interface RenderOptions {
  * Kept separate from `md` rather than toggled on it: render rules are renderer
  * state, and a flag would leak line numbers into whatever exported next.
  */
-const mdTagged = new MarkdownIt({
-    html: false, xhtmlOut: true, breaks: false, linkify: true, typographer: false,
-})
+const mdTagged = createMarkdown()
 
 const offsetOf = (env: unknown): number => (env as { lineOffset?: number })?.lineOffset ?? 0
 
@@ -122,9 +114,10 @@ mdTagged.renderer.rules.image = (tokens, idx, options, env, self) => {
  *   it turns on `data-md-line`; leave it out for exports.
  */
 export function renderFragment(markdown: string, lineOffset?: number): string {
+    const source = normalizeAuthorMarkdown(markdown)
     return lineOffset === undefined
-        ? md.render(markdown)
-        : mdTagged.render(markdown, { lineOffset })
+        ? md.render(source)
+        : mdTagged.render(source, { lineOffset })
 }
 
 /**
@@ -141,7 +134,7 @@ export function renderFragment(markdown: string, lineOffset?: number): string {
  * `&amp;`.
  */
 export function plainText(markdown: string): string {
-    const inline = md.renderInline(markdown.trim())
+    const inline = md.renderInline(normalizeAuthorMarkdown(markdown).trim())
     return unescapeXml(inline.replace(/<[^>]*>/g, '')).trim()
 }
 
@@ -202,6 +195,8 @@ h2 { font-size: 1.28em; margin: 1.6em 0 0.7em; }
 h3 { font-size: 1.1em; margin: 1.4em 0 0.55em; }
 p { margin: 0.8em 0; text-align: justify; }
 li { margin: 0.4em 0; }
+.task-list-item { list-style: none; }
+.task-list-marker { display: inline-block; min-width: 1.25em; }
 ul, ol { padding-left: 1.4em; }
 img { max-width: 100%; height: auto; }
 blockquote {

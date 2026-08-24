@@ -148,6 +148,14 @@ Used APIs:
 
 epub.js was not selected because it has a similar architecture but is older and less actively maintained.
 
+### 5.1 Markdown parsing compatibility
+
+`docs/markdown-compatibility.md` is the normative syntax profile. `render.ts` creates both preview and export parsers through `markdown.ts`, which configures safe CommonMark, GFM tables, static task items, one- and two-tilde strikethrough, and extended autolinks. Raw HTML remains disabled.
+
+A shared, line-preserving normalization pass additionally accepts two frequent manuscript errors from human and AI drafting: an ATX heading without separating whitespace (`##Heading`) and padded strong delimiters (`** text **` or `__ text __`). It skips inline code and fenced code. `split.ts`, `render.ts`, and note chapter detection consume the same parsed heading model, including Setext headings, so chapter boundaries, XHTML, and anchors cannot disagree about them.
+
+The normalization does not add or remove newlines. Therefore markdown-it's `token.map`, preview `data-md-line` attributes, and persisted note line numbers continue to refer to the original Markdown document. A marker-only line such as `##` remains an empty heading under CommonMark and intentionally renders no label.
+
 ---
 
 ## 6. Configuration
@@ -359,7 +367,7 @@ The original exact selector silently failed whenever a quote was not on a block'
 
 Consequently, a multi-line block range currently means “block start line plus offset within the block,” not “physical quote line plus offset within that line.” A sidecar consumer must reconstruct the block context. This limitation is documented rather than hidden.
 
-Rendered text and Markdown source are not identical. A rendered quote such as `both strengths` may originate from `**both strengths**`, so raw substring matching can fail. Line numbers also move after earlier edits; they are hints, not absolute answers. `anchorNote()` searches outward from the recorded line and prefers the nearest match.
+Rendered text and Markdown source are not identical. A rendered quote such as `both strengths` may originate from `**both strengths**`, so raw substring matching can fail. Line numbers also move after earlier edits; they are hints, not absolute answers. `anchorNote()` searches outward from the recorded line and prefers the nearest match inside the note's recorded chapter. If that chapter heading still exists but the quote does not, the note becomes stale instead of jumping to identical words in a later chapter.
 
 If a single-line search fails, re-anchoring joins subsequent non-empty lines into a window and checks whether the quote starts on the current line. The window grows according to quote length, not a fixed number of lines. A fixed line count fails for short paragraphs separated by blank lines. Normalization removes whitespace, so empty lines add no matching information and are skipped efficiently.
 
@@ -378,6 +386,8 @@ Selecting a note must both navigate to its highlight and mark it as the active n
 `chapterStartLines` is required because a CFI does not exist until its chapter has rendered. Most notes in a large book therefore initially have no CFI. Navigation first maps the note's source line to a chapter, opens that chapter using the href from Foliate's TOC, waits for `redrawAll()`, and then moves to the newly created exact CFI.
 
 Selection state stores the **note ID, not the CFI**, because rebuilding regenerates CFIs. The active outline is added to the SVG group produced by `Overlayer.highlight`; the webview does not construct cross-realm SVG nodes itself. Multi-line selections deliberately render as adjacent per-line boxes.
+
+Persisted columns are also hints after revision. Once the host finds the quote's current line, the webview indexes the normalized rendered text in the containing block and reconstructs the DOM range from the saved quote. It uses the old column only to choose between duplicate occurrences. Reusing the old column as the range boundary can highlight a neighboring table cell after text earlier in the row changes.
 
 ### 10.4 Quotes are rendered text; the source is Markdown
 
