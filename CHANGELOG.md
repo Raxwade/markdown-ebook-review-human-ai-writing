@@ -6,6 +6,8 @@ Notable project changes are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-25
+
 ### Added
 
 - Add image annotations with source-linked targets in the JSON notes sidecar.
@@ -56,7 +58,8 @@ Notable project changes are recorded here. The format follows
 
 - Note anchoring and navigation across Markdown syntax, tables, and chapter loads.
 
-[Unreleased]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/releases/tag/v0.5.1

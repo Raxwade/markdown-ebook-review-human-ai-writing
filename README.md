@@ -69,7 +69,7 @@ Verify the installed version with:
 
 ```bash
 code --list-extensions --show-versions | rg epub
-# raxwade.markdown-ebook-review-human-ai-writing@0.6.1
+# raxwade.markdown-ebook-review-human-ai-writing@0.6.2
 ```
 
 Rebuild before reinstalling after a code change. `--force` permits overwriting an installed version; it does not rebuild the VSIX.
