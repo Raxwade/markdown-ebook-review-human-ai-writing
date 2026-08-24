@@ -156,6 +156,15 @@ A shared, line-preserving normalization pass additionally accepts two frequent m
 
 The normalization does not add or remove newlines. Therefore markdown-it's `token.map`, preview `data-md-line` attributes, and persisted note line numbers continue to refer to the original Markdown document. A marker-only line such as `##` remains an empty heading under CommonMark and intentionally renders no label.
 
+The built-in stylesheet allows long table-cell values to wrap anywhere. This
+lowers automatic table layout's minimum content width while preserving natural
+column proportions, so a wide table stays inside Foliate's paginated column. It
+must not depend on a viewport media query: a chapter iframe can span multiple
+pagination columns and be wider than the device frame. A nested horizontal
+scroller is also unreliable because the paginator clips page overflow. A
+user-supplied `mdepub.css` replaces these defaults and is responsible for its
+own narrow-table behavior.
+
 ---
 
 ## 6. Configuration

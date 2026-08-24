@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { XMLValidator } from 'fast-xml-parser'
-import { renderChapter, renderFragment, plainText } from '../src/epub/render'
+import { renderChapter, renderFragment, plainText, DEFAULT_CSS } from '../src/epub/render'
 
 /** Well-formedness is checked with a real parser — eyeballing output is not a test. */
 function assertWellFormed(xml: string, label: string) {
@@ -164,6 +164,14 @@ test('tables, code fences and blockquotes stay well-formed', () => {
         '- item 1', '- item 2', '',
     ].join('\n')
     assertWellFormed(renderChapter(src, 'T', opts), 'chapter with mixed blocks')
+})
+
+test('the default stylesheet bounds wide tables on phone viewports', () => {
+    assert.match(DEFAULT_CSS, /overflow-wrap: anywhere;/)
+    assert.doesNotMatch(DEFAULT_CSS, /table-layout:\s*fixed/,
+        'wide layouts should retain automatic content-proportional columns')
+    assert.doesNotMatch(DEFAULT_CSS, /display:\s*block|overflow-x:\s*(?:auto|scroll)/,
+        'paginated tables must reflow instead of introducing a clipped nested scroller')
 })
 
 test('a title containing markup is escaped in the head', () => {

@@ -101,7 +101,28 @@ async function run() {
   }
 
   // Draw a real note before changing layout; its overlayer child must survive.
-  const content = view.renderer.getContents()[0]
+  const content = await until(() => view.renderer.getContents()
+    .find(item => item.doc.querySelector('table') && item.doc.querySelector('img')), 6000)
+  const narrowTable = content.doc.querySelector('table')
+  const narrowTableStyle = narrowTable
+    ? content.doc.defaultView.getComputedStyle(narrowTable) : null
+  const narrowCellStyle = narrowTable
+    ? content.doc.defaultView.getComputedStyle(narrowTable.querySelector('th, td')) : null
+  const overflowingCells = narrowTable
+    ? [...narrowTable.querySelectorAll('th, td')]
+      .filter(cell => cell.scrollWidth > cell.clientWidth + 1) : []
+  const chapterStyle = content.doc.defaultView.getComputedStyle(content.doc.documentElement)
+  const columnWidth = parseFloat(chapterStyle.columnWidth)
+  check('phone table permits long cell values to wrap',
+    narrowCellStyle?.overflowWrap === 'anywhere', narrowCellStyle?.overflowWrap)
+  check('table retains automatic column proportions',
+    narrowTableStyle?.tableLayout === 'auto', narrowTableStyle?.tableLayout)
+  check('phone table stays inside the declared viewport without cell overflow',
+    narrowTable && Number.isFinite(columnWidth)
+      && narrowTable.clientWidth <= columnWidth + 1
+      && narrowTable.scrollWidth <= narrowTable.clientWidth + 1
+      && overflowingCells.length === 0,
+    `${overflowingCells.length} overflowing cells; table ${narrowTable?.clientWidth}/${columnWidth}`)
   check('GFM task list reaches the real reader',
     content.doc.querySelector('.task-list-marker[role="checkbox"][aria-checked="true"]')?.textContent === '☒')
   check('GFM single-tilde strike reaches the real reader',

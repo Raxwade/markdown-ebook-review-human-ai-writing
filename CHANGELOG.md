@@ -32,6 +32,11 @@ Notable project changes are recorded here. The format follows
 - Add community health files, CI, dependency automation, release guidance, and
   third-party license notices.
 
+### Fixed
+
+- Keep wide Markdown tables inside phone-sized preview pages by using bounded
+  columns and wrapping long cell content instead of letting Foliate crop it.
+
 ## [0.6.1] - 2026-08-16
 
 ### Added

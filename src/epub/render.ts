@@ -209,6 +209,16 @@ pre {
 }
 code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; }
 table { border-collapse: collapse; width: 100%; font-size: 0.9em; }
-th, td { border: 1px solid rgba(127,127,127,0.4); padding: 0.4em 0.6em; }
+/* Automatic table layout honours every cell's min-content width. Letting long
+   values wrap lowers that minimum so a wide Markdown table can remain at 100%
+   instead of being clipped at Foliate's page boundary. This cannot depend on a
+   viewport media query: a paginated chapter iframe can span multiple columns
+   and therefore be wider than the device frame that contains it. */
+th, td {
+  border: 1px solid rgba(127,127,127,0.4);
+  padding: 0.4em 0.6em;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
 hr { border: 0; border-top: 1px solid rgba(127,127,127,0.4); margin: 2em 0; }
 `
