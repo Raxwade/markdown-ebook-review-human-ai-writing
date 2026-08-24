@@ -7,6 +7,7 @@ import { DEVICES, DEFAULTS, deviceSize } from '../src/config'
 const manifest = JSON.parse(
     fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'),
 ) as {
+    icon: string
     contributes: {
         configuration: {
             properties: Record<string, { default?: unknown; enum?: string[]; enumDescriptions?: string[] }>
@@ -14,6 +15,11 @@ const manifest = JSON.parse(
     }
 }
 const props = manifest.contributes.configuration.properties
+
+test('manifest declares the packaged extension icon', () => {
+    assert.equal(manifest.icon, 'images/extension-icon.png')
+    assert.ok(fs.existsSync(path.resolve(__dirname, '../..', manifest.icon)))
+})
 
 test('package.json device enum matches the DEVICES table', () => {
     // The picker's data lives in src/config.ts and is shipped to the webview

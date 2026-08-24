@@ -22,3 +22,4 @@ AGENTS.md
 # .vsix twice now; an icon, if one is ever added, must be un-ignored here.
 *.png
 *.jpg
+!images/extension-icon.png

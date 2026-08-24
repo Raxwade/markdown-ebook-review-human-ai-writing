@@ -1,8 +1,9 @@
 {
   "name": "markdown-ebook-review-human-ai-writing",
   "displayName": "%displayName%",
+  "icon": "images/extension-icon.png",
   "description": "%description%",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "raxwade",
   "license": "ISC",
   "repository": {
