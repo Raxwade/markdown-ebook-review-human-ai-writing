@@ -7,6 +7,11 @@ test('collects local image references in first-seen order', () => {
     assert.deepEqual(collectAssetRefs(xhtml), ['a.png', 'sub/b.jpg'])
 })
 
+test('collects every promised local ebook image format', () => {
+    const xhtml = '<img src="a.svg"/><img src="b.png"/><img src="c.jpg"/><img src="d.jpeg"/><img src="e.webp"/><img src="f.gif"/>'
+    assert.deepEqual(collectAssetRefs(xhtml), ['a.svg', 'b.png', 'c.jpg', 'd.jpeg', 'e.webp', 'f.gif'])
+})
+
 test('remote and data URLs are left alone', () => {
     const xhtml = '<img src="https://x.com/a.png"/><img src="data:image/png;base64,AAA"/><img src="//cdn/a.png"/>'
     assert.deepEqual(collectAssetRefs(xhtml), [])

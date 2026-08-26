@@ -1,6 +1,6 @@
 // markdown → XHTML (spec §3). Pure: string in, string out.
-import { escapeXml, normalizeAuthorMarkdown, unescapeXml } from './text'
-import { createMarkdown } from './markdown'
+import { escapeXml, normalizeAuthorMarkdown, protectRawHtml, unescapeXml } from './text'
+import { createMarkdown, type MarkdownReferences } from './markdown'
 
 // html:false is a correctness requirement, not a policy choice. One raw `<br>`
 // from the source would make the chapter non-well-formed, and a strict EPUB
@@ -26,6 +26,8 @@ export interface RenderOptions {
      * not be handed our bookkeeping.
      */
     lineOffset?: number
+    /** Document-wide references, shared by every chapter after splitting. */
+    references?: MarkdownReferences
 }
 
 /**
@@ -113,11 +115,17 @@ mdTagged.renderer.rules.image = (tokens, idx, options, env, self) => {
  * @param lineOffset the chapter's 0-based start line in the document. Supplying
  *   it turns on `data-md-line`; leave it out for exports.
  */
-export function renderFragment(markdown: string, lineOffset?: number): string {
-    const source = normalizeAuthorMarkdown(markdown)
-    return lineOffset === undefined
-        ? md.render(source)
-        : mdTagged.render(source, { lineOffset })
+export function renderFragment(
+    markdown: string,
+    lineOffset?: number,
+    references?: MarkdownReferences,
+): string {
+    const rawHtml = protectRawHtml(markdown)
+    const source = normalizeAuthorMarkdown(rawHtml.markdown)
+    const rendered = lineOffset === undefined
+        ? md.render(source, { references })
+        : mdTagged.render(source, { lineOffset, references })
+    return rawHtml.restore(rendered)
 }
 
 /**
@@ -133,8 +141,9 @@ export function renderFragment(markdown: string, lineOffset?: number): string {
  * it again on the way into XML, and `&` would otherwise reach the reader as
  * `&amp;`.
  */
-export function plainText(markdown: string): string {
-    const inline = md.renderInline(normalizeAuthorMarkdown(markdown).trim())
+export function plainText(markdown: string, references?: MarkdownReferences): string {
+    const rawHtml = protectRawHtml(markdown)
+    const inline = rawHtml.restore(md.renderInline(normalizeAuthorMarkdown(rawHtml.markdown).trim(), { references }))
     return unescapeXml(inline.replace(/<[^>]*>/g, '')).trim()
 }
 
@@ -160,7 +169,7 @@ ${fragment.trim()}
 }
 
 export function renderChapter(markdown: string, title: string, opts: RenderOptions): string {
-    return wrapDocument(renderFragment(markdown, opts.lineOffset), title, opts)
+    return wrapDocument(renderFragment(markdown, opts.lineOffset, opts.references), title, opts)
 }
 
 /**

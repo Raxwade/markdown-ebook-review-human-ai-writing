@@ -148,7 +148,7 @@ Reader state is local to VS Code. It is never written into the Markdown file or 
 
 ## Chapter splitting and blank space
 
-Every generated EPUB chapter begins on a new page. If a top-level section contains only a heading and a short introduction, the rest of that page is intentionally blank.
+Every generated EPUB chapter begins on a new page. Only document-level headings create chapter boundaries; a heading inside a list or block quote remains part of that Markdown structure. If a top-level section contains only a heading and a short introduction, the rest of that page is intentionally blank.
 
 For technical documents with one `#` title and many `##` sections, use `mdepub.splitLevel: 1` when the document should read continuously. For books whose chapters are `##` headings, keep the default value of `2`.
 
@@ -158,7 +158,7 @@ Choose `Fit current panel` in the device menu when you explicitly want paginatio
 
 The preview and exported EPUB follow the same documented compatibility profile: safe CommonMark, all four user-visible GFM extensions, and author-friendly corrections for frequent human/AI drafting mistakes. See the normative [Markdown Compatibility Specification](docs/markdown-compatibility.md) for the complete 27-family matrix, examples, HTML policy, and explicit non-goals.
 
-Raw HTML such as `<img>` or `<a href="…">` is escaped rather than executed. Use Markdown images (`![alt](path)`) and links (`[label](url)`). `<href>` is not a valid tag. The renderer accepts `##Heading` as `## Heading` and padded strong markers; these corrections never run inside code and do not change source line counts.
+Raw HTML such as `<img>` or `<a href="…">` is escaped rather than executed, and the escaped source does not create Markdown links or images. Use Markdown images (`![alt](path)`) and links (`[label](url)`). `<href>` is not a valid tag. The renderer accepts `##Heading` as `## Heading` and padded strong markers; these corrections never run inside inline, indented, or fenced code and do not change source line counts.
 
 ## Device viewport
 
@@ -231,6 +231,10 @@ cover: cover.jpg
 
 # Chapter One
 ```
+
+Frontmatter is recognized only when the file starts with a nonempty YAML mapping between `---` fences. An empty fence or invalid YAML is rendered as ordinary Markdown, so a thematic break at the start of a manuscript stays a thematic break.
+
+Link and image reference definitions are document-wide, including references used in a later EPUB chapter.
 
 ### Images
 

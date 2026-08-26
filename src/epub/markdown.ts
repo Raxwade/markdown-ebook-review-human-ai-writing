@@ -2,13 +2,16 @@
 // configuration rather than scattered renderer exceptions.
 import MarkdownIt, {
     type Delimiter,
+    type Env,
     type MarkdownIt as MarkdownItInstance,
     type StateCore,
     type StateInline,
 } from 'markdown-it'
-import { normalizeAuthorMarkdown } from './text'
+import { normalizeAuthorMarkdown, protectRawHtml } from './text'
 
 const TILDE = '~'.charCodeAt(0)
+
+export type MarkdownReferences = NonNullable<Env['references']>
 
 /** Convert paired one- or two-tilde runs into a single strike element. */
 function processStrikes(state: StateInline, delimiters: Delimiter[]): void {
@@ -80,7 +83,7 @@ function taskLists(md: MarkdownItInstance): void {
                 || item?.type !== 'list_item_open') continue
             const first = inline.children?.[0]
             if (first?.type !== 'text') continue
-            const marker = /^\[([ xX])\][ \t]+/.exec(first.content)
+            const marker = /^\[([ \txX])\][ \t]+/.exec(first.content)
             if (!marker) continue
 
             item.attrJoin('class', 'task-list-item')
@@ -97,6 +100,155 @@ function taskLists(md: MarkdownItInstance): void {
     }
 }
 
+interface LinkMatch {
+    schema: string
+    index: number
+    lastIndex: number
+    raw: string
+    text: string
+    url: string
+}
+
+const TRAILING_PUNCTUATION = /[?!.,:*_~]$/u
+
+const isExtendedEmail = (text: string): boolean => {
+    const at = text.lastIndexOf('@')
+    if (at <= 0 || at === text.length - 1) return false
+    const local = text.slice(0, at)
+    const domain = text.slice(at + 1)
+    return /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/u.test(local)
+        && /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/u.test(domain)
+}
+
+/** GFM's path suffix rules, shared by www, scheme, and bare-domain links. */
+const trimExtendedPath = (candidate: string): string => {
+    let result = candidate
+    let changed = true
+    while (changed) {
+        changed = false
+        while (TRAILING_PUNCTUATION.test(result)) {
+            result = result.slice(0, -1)
+            changed = true
+        }
+        if (result.endsWith(')')) {
+            const opens = (result.match(/\(/g) ?? []).length
+            const closes = (result.match(/\)/g) ?? []).length
+            if (closes > opens) {
+                result = result.slice(0, -1)
+                changed = true
+            }
+        }
+    }
+    // An entity-looking suffix is prose immediately following the autolink.
+    const entity = /&[A-Za-z0-9]+;$/u.exec(result)
+    return entity ? result.slice(0, entity.index) : result
+}
+
+const isWebAutolink = (match: LinkMatch): boolean =>
+    match.schema === '' || /^(?:https?|ftp):$/iu.test(match.schema)
+
+/**
+ * linkify-it provides the useful broad candidate detection, but its URL-edge
+ * handling differs from GFM. Re-shape each candidate using GFM's path and
+ * email rules while retaining this profile's intentional bare-domain superset.
+ */
+const gfmMatches = (text: string, matches: LinkMatch[]): LinkMatch[] => {
+    const result: LinkMatch[] = []
+    let occupied = 0
+    for (const original of matches) {
+        if (original.index < occupied) continue
+        if (original.schema === 'mailto:' && !isExtendedEmail(original.text)) continue
+
+        let match = { ...original }
+        if (isWebAutolink(match)) {
+            const end = text.slice(match.index).search(/[\s<]/u)
+            const candidate = text.slice(match.index, end < 0 ? text.length : match.index + end)
+            const trimmed = trimExtendedPath(candidate)
+            if (!trimmed) continue
+            match = {
+                ...match,
+                lastIndex: match.index + trimmed.length,
+                raw: trimmed,
+                text: trimmed,
+                url: match.schema ? trimmed : `http://${trimmed}`,
+            }
+        }
+        result.push(match)
+        occupied = match.lastIndex
+    }
+    return result
+}
+
+/** Render extended links in a core pass, after normal inline parsing. */
+function extendedAutolinks(md: MarkdownItInstance): void {
+    // The stock inline rule eagerly handles scheme URLs before the core pass.
+    // Keeping links in text tokens lets one implementation enforce the same
+    // GFM suffix rules for www, bare domains, schemes, and email addresses.
+    md.inline.ruler.disable(['linkify'])
+    md.core.ruler.at('linkify', (state: StateCore) => {
+        if (!state.md.options.linkify) return
+        for (let block = 0; block < state.tokens.length; block++) {
+            if (state.tokens[block]?.type !== 'inline') continue
+            let tokens = state.tokens[block]!.children ?? []
+            for (let i = tokens.length - 1; i >= 0; i--) {
+                const current = tokens[i]!
+                if (current.type === 'link_close') {
+                    i--
+                    while (i >= 0 && tokens[i]!.level !== current.level && tokens[i]!.type !== 'link_open') i--
+                    continue
+                }
+                if (current.type !== 'text') continue
+
+                const text = current.content
+                const matches = gfmMatches(text, (state.md.linkify.match(text) as LinkMatch[] | null) ?? [])
+                if (!matches.length) continue
+
+                const nodes = []
+                let level = current.level
+                let last = 0
+                for (const match of matches) {
+                    const href = state.md.normalizeLink(match.url)
+                    if (!state.md.validateLink(href)) continue
+                    if (match.index > last) {
+                        const before = new state.Token('text', '', 0)
+                        before.content = text.slice(last, match.index)
+                        before.level = level
+                        nodes.push(before)
+                    }
+                    const open = new state.Token('link_open', 'a', 1)
+                    open.attrs = [['href', href]]
+                    open.level = level++
+                    open.markup = 'linkify'
+                    open.info = 'auto'
+                    nodes.push(open)
+
+                    const label = new state.Token('text', '', 0)
+                    label.content = match.schema
+                        ? state.md.normalizeLinkText(match.text)
+                        : state.md.normalizeLinkText(`http://${match.text}`).replace(/^http:\/\//u, '')
+                    label.level = level
+                    nodes.push(label)
+
+                    const close = new state.Token('link_close', 'a', -1)
+                    close.level = --level
+                    close.markup = 'linkify'
+                    close.info = 'auto'
+                    nodes.push(close)
+                    last = match.lastIndex
+                }
+                if (last < text.length) {
+                    const after = new state.Token('text', '', 0)
+                    after.content = text.slice(last)
+                    after.level = level
+                    nodes.push(after)
+                }
+                tokens.splice(i, 1, ...nodes)
+                state.tokens[block]!.children = tokens
+            }
+        }
+    })
+}
+
 /** Create a parser with the exact syntax profile promised by the specification. */
 export function createMarkdown(): MarkdownItInstance {
     const md = new MarkdownIt({
@@ -106,12 +258,12 @@ export function createMarkdown(): MarkdownItInstance {
         linkify: true,
         typographer: false,
     })
-    // GFM extended autolinks include `www.` forms. markdown-it 15 disables
-    // fuzzy links by default; enabling them also accepts bare domains, a useful
-    // and safe authoring superset. validateLink still rejects unsafe schemes.
+    // GFM extended autolinks include `www.` forms. Fuzzy links are also an
+    // intentional safe authoring superset for bare domains.
     md.linkify.set({ fuzzyLink: true })
     gfmStrike(md)
     taskLists(md)
+    extendedAutolinks(md)
     return md
 }
 
@@ -119,6 +271,8 @@ export interface MarkdownHeading {
     startLine: number
     endLine: number
     level: number
+    /** 0 means document level; a larger value is nested in a list or quote. */
+    containerLevel: number
     /** Markdown source inside the heading, before reduction to a plain label. */
     title: string
 }
@@ -127,7 +281,8 @@ const headingParser = createMarkdown()
 
 /** Discover ATX and Setext headings using the same parser that renders them. */
 export function parseMarkdownHeadings(markdown: string): MarkdownHeading[] {
-    const tokens = headingParser.parse(normalizeAuthorMarkdown(markdown), {})
+    const rawHtml = protectRawHtml(markdown)
+    const tokens = headingParser.parse(normalizeAuthorMarkdown(rawHtml.markdown), {})
     const headings: MarkdownHeading[] = []
     for (let i = 0; i < tokens.length - 1; i++) {
         const open = tokens[i]
@@ -139,8 +294,17 @@ export function parseMarkdownHeadings(markdown: string): MarkdownHeading[] {
             startLine: open.map[0],
             endLine: open.map[1],
             level,
-            title: inline.content.replace(/\s+/g, ' ').trim(),
+            containerLevel: open.level,
+            title: rawHtml.restore(inline.content).replace(/\s+/g, ' ').trim(),
         })
     }
     return headings
+}
+
+/** Parse the document once so every split chapter shares CommonMark references. */
+export function parseMarkdownReferences(markdown: string): MarkdownReferences {
+    const env: Env = {}
+    const rawHtml = protectRawHtml(markdown)
+    headingParser.parse(normalizeAuthorMarkdown(rawHtml.markdown), env)
+    return env.references ?? {}
 }

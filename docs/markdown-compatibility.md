@@ -8,17 +8,21 @@ This document defines what Markdown Ebook Review — Human–AI Writing promises
 
 The same profile applies to the live preview and exported EPUB. A construct marked supported must retain the same meaning in both paths and produce well-formed XHTML.
 
+A leading, non-empty YAML mapping is metadata frontmatter rather than Markdown
+content. Empty, invalid, or non-mapping `---` candidates remain Markdown, so
+ordinary leading thematic breaks are never silently discarded.
+
 ## Guaranteed syntax
 
 | # | Syntax family | Status | Required behavior |
 |---:|---|---|---|
-| 1 | Thematic breaks | Supported | Render as a horizontal rule. |
-| 2 | ATX headings | Supported | Render levels 1–6; levels 1–2 can split chapters according to `mdepub.splitLevel`. |
-| 3 | Setext headings | Supported | `=` renders level 1 and `-` level 2; both participate in chapter splitting. |
+| 1 | Thematic breaks | Supported | Render as a horizontal rule, except a leading valid YAML frontmatter mapping. |
+| 2 | ATX headings | Supported | Render levels 1–6; document-level levels 1–2 can split chapters according to `mdepub.splitLevel`. |
+| 3 | Setext headings | Supported | `=` renders level 1 and `-` level 2; document-level headings participate in chapter splitting. |
 | 4 | Indented code blocks | Supported | Preserve literal text and whitespace. |
 | 5 | Fenced code blocks | Supported | Backtick and tilde fences preserve literal text and expose the language as a CSS class. Syntax highlighting is not promised. |
 | 6 | HTML blocks | Rejected safely | Escape and display as text; never execute or inject them. |
-| 7 | Link-reference definitions | Supported | Resolve full, collapsed, and shortcut references without displaying the definition. |
+| 7 | Link-reference definitions | Supported | Resolve full, collapsed, and shortcut references without displaying the definition, including across chapter boundaries. |
 | 8 | Paragraphs | Supported | Render as reflowable paragraphs. |
 | 9 | Blank lines | Supported | Separate blocks without creating visible content. |
 | 10 | Block quotes | Supported | Preserve nesting and inline formatting. |
@@ -52,7 +56,9 @@ The following narrowly scoped corrections are intentional extensions for human- 
 | `** padded **` | `**padded**` |
 | `__ padded __` | `__padded__` |
 
-Corrections do not run inside inline or fenced code and never change the number of source lines. A bare `##` is already a valid empty heading and therefore has no visible label.
+Corrections do not run inside inline, indented, or fenced code, and never change
+the number of source lines. A bare `##` is already a valid empty heading and
+therefore has no visible label.
 
 ## HTML policy
 
@@ -97,7 +103,9 @@ Automated tests must contain at least one positive case for every supported fami
 3. Matching preview and export semantics, allowing preview-only source attributes.
 4. Chapter and table-of-contents behavior for both ATX and Setext headings.
 5. Local image packaging and path rewriting.
-6. No author-friendly rewriting inside inline or fenced code.
+6. No author-friendly rewriting inside inline, indented, or fenced code.
 7. Raw HTML remains escaped and cannot create active elements.
+8. Document-wide reference links and images still resolve after chapter splitting.
+9. Empty or invalid frontmatter candidates retain their Markdown meaning.
 
 Changes to the promised profile require updates to this specification, its conformance matrix, the README, architecture documentation, and regression tests in the same change.

@@ -117,6 +117,32 @@ test('images are packed, rewritten, and declared in the manifest', () => {
     assert.ok(text(files, 'OEBPS/ch001.xhtml').includes('src="assets/a.png"'))
 })
 
+test('document-wide reference definitions survive chapter splitting', () => {
+    const result = build({
+        markdown: [
+            '# My [book][title]',
+            '',
+            'See [the appendix][appendix]. ![Cover][cover]',
+            '',
+            '## Appendix',
+            '',
+            '[title]: https://example.com/title',
+            '[appendix]: https://example.com/appendix',
+            '[cover]: cover.png',
+        ].join('\n'),
+        readAsset: ref => (ref === 'cover.png' ? strToU8('image') : null),
+        modified: MODIFIED,
+    })
+    const files = open(result.bytes)
+    const first = text(files, 'OEBPS/ch001.xhtml')
+    assert.equal(result.title, 'My book')
+    assert.equal(result.chapters[0]!.title, 'My book')
+    assert.match(first, /href="https:\/\/example\.com\/title">book<\/a>/)
+    assert.match(first, /href="https:\/\/example\.com\/appendix">the appendix<\/a>/)
+    assert.match(first, /src="assets\/cover\.png"/)
+    assert.ok(files['OEBPS/assets/cover.png'], 'reference image was not packaged')
+})
+
 test('an unreadable image warns and leaves no dangling reference', () => {
     const result = build({
         markdown: '# T\n\n![alt](missing.png)\n',

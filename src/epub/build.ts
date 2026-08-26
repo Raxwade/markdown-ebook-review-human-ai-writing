@@ -6,6 +6,7 @@ import type { Config } from '../config'
 import { DEFAULTS } from '../config'
 import type { UiLocale } from '../i18n'
 import { parseFrontmatter } from './frontmatter'
+import { parseMarkdownReferences, type MarkdownReferences } from './markdown'
 import { splitChapters } from './split'
 import { renderChapter, plainText, DEFAULT_CSS } from './render'
 import { collectAssetRefs, planAssetPaths, applyAssetPlan } from './assets'
@@ -69,6 +70,7 @@ function resolveTitle(
     meta: Record<string, string | undefined>,
     chapters: { title: string; level: number }[],
     basename?: string,
+    references?: MarkdownReferences,
 ): string {
     // Frontmatter is a literal string the user wrote, not markdown, so it is used
     // as typed. A heading is markdown and has to be reduced to its text first —
@@ -78,7 +80,7 @@ function resolveTitle(
     const fromHeadings = [
         ...chapters.filter(c => c.level === 1),
         ...chapters,
-    ].map(c => plainText(c.title)).find(Boolean)
+    ].map(c => plainText(c.title, references)).find(Boolean)
     return fromHeadings || basename || 'Untitled'
 }
 
@@ -128,7 +130,8 @@ export function build(input: BuildInput): BuildResult {
     const lang = meta.lang || config.lang
     const author = meta.author ?? config.author
     const chapters = splitChapters(body, config.splitLevel)
-    const title = resolveTitle(meta, chapters, input.basename)
+    const references = parseMarkdownReferences(body)
+    const title = resolveTitle(meta, chapters, input.basename, references)
 
     // Render every chapter, then collect asset references across all of them so
     // one plan covers the whole book and a shared image is packed once.
@@ -139,7 +142,7 @@ export function build(input: BuildInput): BuildResult {
     // no use for them.
     const tagLines = input.mode !== 'export'
     const rendered = chapters.map((c, i) => {
-        const label = plainText(c.title) || title
+        const label = plainText(c.title, references) || title
         return {
             id: `ch${String(i + 1).padStart(3, '0')}`,
             title: label,
@@ -148,6 +151,7 @@ export function build(input: BuildInput): BuildResult {
                 lang,
                 stylesheet: STYLESHEET,
                 lineOffset: tagLines ? bodyStartLine + c.startLine : undefined,
+                references,
             }),
         }
     })

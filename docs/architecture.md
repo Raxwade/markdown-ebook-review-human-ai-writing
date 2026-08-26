@@ -150,9 +150,9 @@ epub.js was not selected because it has a similar architecture but is older and 
 
 ### 5.1 Markdown parsing compatibility
 
-`docs/markdown-compatibility.md` is the normative syntax profile. `render.ts` creates both preview and export parsers through `markdown.ts`, which configures safe CommonMark, GFM tables, static task items, one- and two-tilde strikethrough, and extended autolinks. Raw HTML remains disabled.
+`docs/markdown-compatibility.md` is the normative syntax profile. `render.ts` creates both preview and export parsers through `markdown.ts`, which configures safe CommonMark, GFM tables, static task items, one- and two-tilde strikethrough, and extended autolinks. Raw HTML remains disabled and is shielded before parsing, so Markdown or linkification inside a disabled tag cannot create active content. Reference definitions are parsed once from the complete manuscript and supplied to every rendered chapter, so links, reference images, chapter labels, and asset collection keep CommonMark's document-wide definition scope.
 
-A shared, line-preserving normalization pass additionally accepts two frequent manuscript errors from human and AI drafting: an ATX heading without separating whitespace (`##Heading`) and padded strong delimiters (`** text **` or `__ text __`). It skips inline code and fenced code. `split.ts`, `render.ts`, and note chapter detection consume the same parsed heading model, including Setext headings, so chapter boundaries, XHTML, and anchors cannot disagree about them.
+A shared, line-preserving normalization pass additionally accepts two frequent manuscript errors from human and AI drafting: an ATX heading without separating whitespace (`##Heading`) and padded strong delimiters (`** text **` or `__ text __`). It skips inline (including multiline), indented, and fenced code. `split.ts`, `render.ts`, and note chapter detection consume the same parsed heading model, including Setext headings, so chapter boundaries, XHTML, and anchors cannot disagree about them. Only document-level headings split chapters; headings within list items or block quotes stay in their containing Markdown structure.
 
 The normalization does not add or remove newlines. Therefore markdown-it's `token.map`, preview `data-md-line` attributes, and persisted note line numbers continue to refer to the original Markdown document. A marker-only line such as `##` remains an empty heading under CommonMark and intentionally renders no label.
 
@@ -182,7 +182,7 @@ All `mdepub.*` settings have defaults, so the extension works without configurat
 | `author` / `cover` | none | Optional book metadata. |
 | `debounce` | `120` | Rebuild delay in milliseconds. |
 
-Book metadata precedence is **YAML frontmatter > VS Code settings > values inferred from the first `#` heading and filename**.
+Book metadata precedence is **YAML frontmatter > VS Code settings > values inferred from the first `#` heading and filename**. Frontmatter is only a leading, non-empty YAML mapping. Empty, invalid, and non-mapping delimiter candidates are rendered as Markdown so leading thematic breaks remain available to manuscripts.
 
 Image paths are resolved relative to the Markdown file. The renderer collects referenced files and packages SVG, PNG, JPEG, WebP, and GIF images. Three rules matter:
 

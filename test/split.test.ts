@@ -45,6 +45,18 @@ test('text before the first heading survives as its own chapter', () => {
     assert.match(chapters[0]!.markdown, /loose preamble/)
 })
 
+test('leading indentation is preserved when a chapter starts with code', () => {
+    const chapter = splitChapters('    literal <code>\n    second line\n', 2)[0]!
+    assert.equal(chapter.markdown, '    literal <code>\n    second line')
+})
+
+test('headings nested in list items do not split a chapter', () => {
+    const source = '- item\n\n  ## Nested heading\n\n  continuation\n'
+    const chapters = splitChapters(source, 2)
+    assert.equal(chapters.length, 1)
+    assert.equal(chapters[0]!.markdown, source.trim())
+})
+
 test('a document with no headings is one chapter', () => {
     const chapters = splitChapters('just text\n\nmore text\n', 2)
     assert.equal(chapters.length, 1)

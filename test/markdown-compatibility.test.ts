@@ -109,6 +109,23 @@ test('GFM families 24–27 are all supported', () => {
     wellFormed(source)
 })
 
+test('GFM edge grammar follows task-marker whitespace and extended-autolink rules', () => {
+    const source = [
+        '- [\t] tab means unchecked',
+        '',
+        'www.google.com/search?q=(business))+ok',
+        'www.google.com/search?q=commonmark&hl;',
+        "hello@mail+xyz.example is invalid, but hello+xyz@mail.example is valid.",
+    ].join('\n')
+    const html = rendered(source)
+    assert.match(html, /aria-checked="false">☐<\/span> tab means unchecked/)
+    assert.match(html, /href="http:\/\/www\.google\.com\/search\?q=\(business\)\)\+ok"/)
+    assert.match(html, /href="http:\/\/www\.google\.com\/search\?q=commonmark">[^<]+<\/a>&amp;hl;/)
+    assert.doesNotMatch(html, /href="mailto:hello@mail\+xyz\.example"/)
+    assert.match(html, /href="mailto:hello\+xyz@mail\.example"/)
+    wellFormed(source)
+})
+
 test('raw HTML and unsafe links remain inactive', () => {
     const source = [
         '<img src="cover.png" onerror="bad()">',
@@ -124,6 +141,22 @@ test('raw HTML and unsafe links remain inactive', () => {
     wellFormed(source)
 })
 
+test('raw HTML is displayed as literal text without activating nested Markdown', () => {
+    const source = [
+        '<a href="https://example.com">Label</a>',
+        '',
+        '<img alt="*literal*" src="https://example.com/a.png">',
+        '',
+        '<div>', '*also literal* www.example.com', '</div>',
+    ].join('\n')
+    const html = rendered(source)
+    assert.match(html, /&lt;a href=&quot;https:\/\/example\.com&quot;&gt;Label&lt;\/a&gt;/)
+    assert.match(html, /&lt;img alt=&quot;\*literal\*&quot; src=&quot;https:\/\/example\.com\/a\.png&quot;&gt;/)
+    assert.match(html, /&lt;div&gt;\n\*also literal\* www\.example\.com\n&lt;\/div&gt;/)
+    assert.doesNotMatch(html, /<a href="https:\/\/example\.com"|<em>literal|<em>also literal/)
+    wellFormed(source)
+})
+
 test('author-friendly corrections never enter inline or fenced code', () => {
     const html = rendered([
         '##Heading', '',
@@ -135,6 +168,49 @@ test('author-friendly corrections never enter inline or fenced code', () => {
     assert.match(html, /<strong>padded<\/strong>/)
     assert.match(html, /<code>##Code \*\* padded \*\* ~strike~<\/code>/)
     assert.match(html, /<code class="language-markdown">##Code\n\*\* padded \*\* ~strike~\n<\/code>/)
+})
+
+test('author-friendly corrections preserve indented, escaped, and multiline code spans', () => {
+    const source = [
+        '    ** padded **',
+        '',
+        '\\\\`** padded **`',
+        '',
+        '`first',
+        '** padded **',
+        '##Heading',
+        'last`',
+    ].join('\n')
+    const html = rendered(source)
+    assert.match(html, /<pre><code>\*\* padded \*\*\n<\/code><\/pre>/)
+    assert.match(html, /<p>\\<code>\*\* padded \*\*<\/code><\/p>/)
+    assert.match(html, /<code>first \*\* padded \*\* ##Heading last<\/code>/)
+    assert.doesNotMatch(html, /<h2>Heading<\/h2>/)
+})
+
+test('unadopted extensions remain literal Markdown rather than gaining plugin semantics', () => {
+    const source = [
+        'Footnote[^1]',
+        '',
+        'Term', ': definition',
+        '',
+        '$x^2$',
+        '',
+        '```mermaid', 'graph TD', '```',
+        '',
+        '[[Page]] :smile:',
+        '',
+        '# Heading {#custom-id}',
+        '',
+        '[^1]: not a footnote definition',
+    ].join('\n')
+    const html = rendered(source)
+    assert.match(html, /Footnote\[\^1\]/)
+    assert.doesNotMatch(html, /<dl>|<sup|class="footnote/)
+    assert.match(html, /\$x\^2\$/)
+    assert.match(html, /<code class="language-mermaid">graph TD\n<\/code>/)
+    assert.match(html, /\[\[Page\]\] :smile:/)
+    assert.match(html, /<h1>Heading \{#custom-id\}<\/h1>/)
 })
 
 test('ATX and Setext headings produce the same chapter and TOC behavior', () => {
@@ -154,6 +230,12 @@ test('ATX and Setext headings produce the same chapter and TOC behavior', () => 
     for (const label of ['ATX book', 'Setext chapter', 'ATX chapter']) {
         assert.match(nav, new RegExp(`>${label}<`))
     }
+})
+
+test('leading thematic breaks are not swallowed by empty frontmatter fences', () => {
+    const result = buildForExport({ markdown: '---\n---\n# Book\n', basename: 'grammar' })
+    const chapter = strFromU8(unzipSync(result.bytes)['OEBPS/ch001.xhtml']!)
+    assert.equal((chapter.match(/<hr \/>/g) ?? []).length, 2)
 })
 
 test('preview and export apply the same compatibility semantics', () => {

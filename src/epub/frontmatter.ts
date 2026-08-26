@@ -54,13 +54,13 @@ const FENCE = /^---[ \t]*\n/
 const FRONTMATTER_WARNINGS: Record<UiLocale, Record<'unclosed' | 'invalidYaml' | 'notMapping', string>> = {
     en: {
         unclosed: 'Frontmatter starts with --- but has no closing delimiter; treating the entire file as content.',
-        invalidYaml: 'Frontmatter YAML could not be parsed and was ignored: {error}',
-        notMapping: 'Frontmatter is not a key-value mapping and was ignored.',
+        invalidYaml: 'Frontmatter YAML could not be parsed; it was rendered as Markdown content: {error}',
+        notMapping: 'Frontmatter is not a key-value mapping; it was rendered as Markdown content.',
     },
     'zh-TW': {
         unclosed: 'frontmatter 開頭有 --- 但找不到結尾，整份當成內文處理。',
-        invalidYaml: 'frontmatter YAML 解析失敗，已忽略：{error}',
-        notMapping: 'frontmatter 不是 key: value 結構，已忽略。',
+        invalidYaml: 'frontmatter YAML 解析失敗，已當成 Markdown 內文呈現：{error}',
+        notMapping: 'frontmatter 不是 key: value 結構，已當成 Markdown 內文呈現。',
     },
 }
 
@@ -93,22 +93,24 @@ export function parseFrontmatter(source: string, locale: UiLocale = 'en'): Front
         + countLines(rest.slice(0, close.index + close[0].length))
         + countLines(afterClose.slice(0, afterClose.length - body.length))
 
-    // `---\n---\n` is empty metadata, not a parse error; js-yaml throws on it.
-    if (!yamlText.trim()) return { meta: {}, body, bodyStartLine, warnings }
+    // Empty delimiters are valid CommonMark thematic breaks. Treating them as
+    // metadata would silently erase visible manuscript content, so frontmatter
+    // needs at least one mapping entry to take precedence over Markdown.
+    if (!yamlText.trim()) return { meta: {}, body: src, bodyStartLine: 0, warnings }
 
     let parsed: unknown
     try {
         parsed = load(yamlText)
     } catch (err) {
         warnings.push(warning(locale, 'invalidYaml', (err as Error).message))
-        return { meta: {}, body, bodyStartLine, warnings }
+        return { meta: {}, body: src, bodyStartLine: 0, warnings }
     }
 
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
         if (parsed !== null && parsed !== undefined) {
             warnings.push(warning(locale, 'notMapping'))
         }
-        return { meta: {}, body, bodyStartLine, warnings }
+        return { meta: {}, body: src, bodyStartLine: 0, warnings }
     }
 
     const meta: BookMeta = {}

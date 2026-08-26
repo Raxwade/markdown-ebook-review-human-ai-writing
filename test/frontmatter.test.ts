@@ -51,10 +51,12 @@ test('sequences are joined, nulls dropped', () => {
     assert.equal(meta.empty, undefined)
 })
 
-test('broken YAML is a warning, not a throw', () => {
-    const { meta, body, warnings } = parseFrontmatter('---\ntitle: "unterminated\n---\n\nbody\n')
+test('broken YAML is a warning and remains Markdown content', () => {
+    const src = '---\ntitle: "unterminated\n---\n\nbody\n'
+    const { meta, body, bodyStartLine, warnings } = parseFrontmatter(src)
     assert.deepEqual(meta, {})
-    assert.equal(body, 'body\n')
+    assert.equal(body, src)
+    assert.equal(bodyStartLine, 0)
     assert.equal(warnings.length, 1)
 })
 
@@ -72,9 +74,20 @@ test('... closes a frontmatter block', () => {
     assert.equal(body, 'body\n')
 })
 
-test('empty frontmatter yields no metadata and no warning', () => {
-    const { meta, body, warnings } = parseFrontmatter('---\n---\nbody\n')
+test('empty frontmatter fences remain Markdown thematic breaks', () => {
+    const src = '---\n---\nbody\n'
+    const { meta, body, bodyStartLine, warnings } = parseFrontmatter(src)
     assert.deepEqual(meta, {})
-    assert.equal(body, 'body\n')
+    assert.equal(body, src)
+    assert.equal(bodyStartLine, 0)
     assert.deepEqual(warnings, [])
+})
+
+test('a non-mapping frontmatter candidate remains Markdown content', () => {
+    const src = '---\nordinary paragraph\n---\n'
+    const { meta, body, bodyStartLine, warnings } = parseFrontmatter(src)
+    assert.deepEqual(meta, {})
+    assert.equal(body, src)
+    assert.equal(bodyStartLine, 0)
+    assert.equal(warnings.length, 1)
 })

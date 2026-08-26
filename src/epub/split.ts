@@ -20,14 +20,14 @@ export interface Chapter {
 }
 
 /**
- * Chapters break at any ATX or Setext heading of depth <= splitLevel. Text before the
- * first such heading becomes its own chapter so nothing is silently dropped;
+ * Chapters break at document-level ATX or Setext headings of depth <= splitLevel.
+ * Text before the first such heading becomes its own chapter so nothing is silently dropped;
  * a document with no headings comes back as a single chapter.
  */
 export function splitChapters(markdown: string, splitLevel: 1 | 2): Chapter[] {
     const lines = normalizeNewlines(markdown).split('\n')
     const headings = new Map(parseMarkdownHeadings(markdown)
-        .filter(heading => heading.level <= splitLevel)
+        .filter(heading => heading.level <= splitLevel && heading.containerLevel === 0)
         .map(heading => [heading.startLine, heading]))
 
     const chapters: Chapter[] = []
@@ -37,13 +37,16 @@ export function splitChapters(markdown: string, splitLevel: 1 | 2): Chapter[] {
     let bufferStart = 0
 
     const flush = (nextStart: number) => {
-        const text = buffer.join('\n').trim()
+        let first = 0
+        let last = buffer.length
+        while (first < last && buffer[first]!.trim() === '') first++
+        while (last > first && buffer[last - 1]!.trim() === '') last--
+        const text = buffer.slice(first, last).join('\n')
         if (text || current.title) {
-            // `trim()` removes leading blank lines; skipping the same lines here
-            // keeps startLine pointing at the first line `markdown` actually has.
-            let lead = 0
-            while (lead < buffer.length && buffer[lead]!.trim() === '') lead++
-            chapters.push({ ...current, markdown: text, startLine: bufferStart + lead })
+            // Trim only blank boundary lines. Whitespace inside a non-blank line
+            // is Markdown syntax: stripping it would turn an indented code block
+            // into a paragraph or mutate code text at the end of a chapter.
+            chapters.push({ ...current, markdown: text, startLine: bufferStart + first })
         }
         buffer = []
         bufferStart = nextStart
