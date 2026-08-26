@@ -6,6 +6,12 @@ Notable project changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Clarify the boundary between the extension's human–AI review loop and the
+  author's separate production build, validation, and deployment pipeline, with
+  a new workflow diagram in the README.
+
 ## [0.6.3] - 2026-08-25
 
 ### Added

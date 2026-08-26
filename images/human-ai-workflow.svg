@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="740" viewBox="0 0 1440 740" role="img" aria-labelledby="title desc">
+  <title id="title">Human and AI ebook review and publishing workflow</title>
+  <desc id="desc">A black-and-white diagram. A review loop moves from a Markdown manuscript to human EPUB review, structured JSON notes, and AI revision. Once approved, a separate author-owned script builds, tests, and deploys the final EPUB.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#111"/>
+    </marker>
+    <style>
+      .title { font: 700 30px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #111; }
+      .lane { font: 700 15px system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: 1px; fill: #111; }
+      .node-title { font: 700 21px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #111; }
+      .node-copy { font: 500 15px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #111; }
+      .small { font: 700 14px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #111; }
+      .node { fill: #fff; stroke: #111; stroke-width: 2.5; }
+      .line { fill: none; stroke: #111; stroke-width: 3; marker-end: url(#arrow); }
+      .icon { fill: none; stroke: #111; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+      .icon-thin { fill: none; stroke: #111; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="740" fill="#fff"/>
+  <text class="title" x="720" y="43" text-anchor="middle">Human–AI review first. Production publishing second.</text>
+
+  <rect x="25" y="70" width="1390" height="390" rx="24" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <rect x="58" y="56" width="365" height="36" rx="18" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text class="lane" x="240" y="80" text-anchor="middle">REVIEW LOOP · THIS EXTENSION</text>
+
+  <g transform="translate(65 135)">
+    <rect class="node" width="270" height="180" rx="20"/>
+    <path class="icon" d="M103 20h48l20 20v58h-68zM151 20v20h20M118 60h38M118 77h29"/>
+    <text class="node-title" x="135" y="126" text-anchor="middle">Markdown manuscript</text>
+    <text class="node-copy" x="135" y="153" text-anchor="middle">Source of truth</text>
+  </g>
+
+  <path class="line" d="M335 225h75"/>
+
+  <g transform="translate(410 135)">
+    <rect class="node" width="270" height="180" rx="20"/>
+    <circle class="icon-thin" cx="135" cy="39" r="16"/>
+    <path class="icon-thin" d="M106 79c4-19 15-29 29-29s25 10 29 29"/>
+    <path class="icon-thin" d="M80 73c20-5 38-1 55 12v23c-17-12-35-16-55-11zm110 0c-20-5-38-1-55 12v23c17-12 35-16 55-11z"/>
+    <text class="node-title" x="135" y="126" text-anchor="middle">Human author</text>
+    <text class="node-copy" x="135" y="153" text-anchor="middle">Reviews the EPUB layout</text>
+  </g>
+
+  <path class="line" d="M680 225h75"/>
+
+  <g transform="translate(755 135)">
+    <rect class="node" width="270" height="180" rx="20"/>
+    <path class="icon" d="M103 20h48l20 20v58h-68zM151 20v20h20"/>
+    <text x="137" y="76" text-anchor="middle" font-family="ui-monospace, monospace" font-size="29" font-weight="700" fill="#111">{ }</text>
+    <text class="node-title" x="135" y="126" text-anchor="middle">Notes JSON</text>
+    <text class="node-copy" x="135" y="153" text-anchor="middle">AI-readable revision brief</text>
+  </g>
+
+  <path class="line" d="M1025 225h75"/>
+
+  <g transform="translate(1100 135)">
+    <rect class="node" width="270" height="180" rx="20"/>
+    <path class="icon-thin" d="M135 16l6.8 20.7a10 10 0 0 0 6.5 6.5L169 50l-20.7 6.8a10 10 0 0 0-6.5 6.5L135 84l-6.8-20.7a10 10 0 0 0-6.5-6.5L101 50l20.7-6.8a10 10 0 0 0 6.5-6.5z"/>
+    <path class="icon-thin" d="M103 17v13m-6.5-6.5h13M166 70v13m-6.5-6.5h13"/>
+    <text class="node-title" x="135" y="126" text-anchor="middle">AI assistant</text>
+    <text class="node-copy" x="135" y="153" text-anchor="middle">Revises the Markdown</text>
+  </g>
+
+  <text class="small" x="718" y="387" text-anchor="middle">Repeat until the author approves</text>
+  <path d="M1235 315v95H200v-91" fill="none" stroke="#111" stroke-width="3" stroke-dasharray="9 7" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+
+  <rect x="25" y="500" width="1390" height="215" rx="24" fill="#fff" stroke="#111" stroke-width="2.5" stroke-dasharray="12 8"/>
+  <rect x="58" y="486" width="455" height="36" rx="18" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <text class="lane" x="285" y="510" text-anchor="middle">PUBLISHING PIPELINE · YOUR SCRIPT</text>
+
+  <path d="M720 460v34" fill="none" stroke="#111" stroke-width="3" marker-end="url(#arrow)"/>
+  <text class="small" x="744" y="483">Approved</text>
+
+  <g transform="translate(70 545)">
+    <rect class="node" width="250" height="125" rx="20"/>
+    <path class="icon" d="M27 22h48l20 20v61H27zM75 22v20h20M42 62h38M42 79h29"/>
+    <text class="node-title" x="168" y="52" text-anchor="middle">Approved</text>
+    <text class="node-title" x="168" y="77" text-anchor="middle">Markdown</text>
+    <text class="node-copy" x="168" y="100" text-anchor="middle">Production source</text>
+  </g>
+
+  <path class="line" d="M320 607h75"/>
+
+  <g transform="translate(395 545)">
+    <rect class="node" width="250" height="125" rx="20"/>
+    <rect x="27" y="24" width="70" height="55" rx="8" fill="#111"/>
+    <path d="M44 40l11 10-11 10M63 64h18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text class="node-title" x="172" y="52" text-anchor="middle">Build script</text>
+    <text class="node-copy" x="172" y="79" text-anchor="middle">Builds and tests</text>
+  </g>
+
+  <path class="line" d="M645 607h75"/>
+
+  <g transform="translate(720 545)">
+    <rect class="node" width="250" height="125" rx="20"/>
+    <path d="M28 22h68v81H28z" fill="#111"/>
+    <path d="M76 22v20h20" fill="#fff"/>
+    <text x="62" y="73" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="800" fill="#fff">EPUB</text>
+    <text class="node-title" x="173" y="52" text-anchor="middle">Final EPUB</text>
+    <text class="node-copy" x="173" y="79" text-anchor="middle">Production artifact</text>
+  </g>
+
+  <path class="line" d="M970 607h75"/>
+
+  <g transform="translate(1045 545)">
+    <rect class="node" width="250" height="125" rx="20"/>
+    <path class="icon" d="M63 87V34m0 0L46 51m17-17l17 17M34 90h58"/>
+    <text class="node-title" x="173" y="52" text-anchor="middle">Deploy</text>
+    <text class="node-copy" x="173" y="79" text-anchor="middle">Store, site, or readers</text>
+  </g>
+
+  <text x="720" y="700" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#111">The production script and deployment target belong to the author’s project; this extension does not provide or run them.</text>
+</svg>

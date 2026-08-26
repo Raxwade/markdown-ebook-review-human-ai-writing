@@ -1,8 +1,14 @@
 # Markdown Ebook Review — Human–AI Writing Architecture
 
-A VS Code extension that turns any Markdown file into an EPUB and previews it live in a panel beside the editor. Changes should appear within one second. The extension is independent of project-specific build scripts and does not require Pandoc or Calibre.
+A VS Code extension that turns any Markdown file into an EPUB and previews it live in a panel beside the editor. Changes should appear within one second. The extension is independent of project-specific build scripts and does not require Pandoc or Calibre for review.
 
 Authors can search, highlight, bookmark, and leave revision notes directly on the rendered ebook. Notes are stored in a structured JSON sidecar so a human author can give an AI precise, reviewable instructions for the next revision.
+
+The product boundary ends at review and manual EPUB export. After the author
+approves a revision, the book project owns a separate production script or CI
+pipeline that builds from the approved Markdown and assets, validates the
+artifact, and deploys it to the intended distribution target. The extension
+does not create, invoke, or manage that automation.
 
 The package name is `markdown-ebook-review-human-ai-writing`, and the full VS Code extension ID is `raxwade.markdown-ebook-review-human-ai-writing`. Settings and commands retain the shorter `mdepub.*` namespace to keep workspace configuration and automation stable.
 
@@ -26,6 +32,8 @@ The package name is `markdown-ebook-review-human-ai-writing`, and the full VS Co
 - Editing existing `.epub` files.
 - Full EPUB specification validation; use EPUBCheck separately.
 - Installing Pandoc or Calibre. The pipeline is pure JavaScript.
+- Creating or invoking a project-specific production build/deploy pipeline.
+- Publishing artifacts to stores, websites, or other distribution services.
 
 ---
 

@@ -2,24 +2,49 @@
 
 [![CI](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml)
 
-Preview your Markdown manuscript as an ebook, leave structured notes, and guide the next AI revision.
+Preview your Markdown manuscript as an ebook, leave AI-readable review notes,
+and repeat until the author approves the book.
 
 Markdown Ebook Review — Human–AI Writing is a VS Code extension for authors who write books in Markdown, especially authors who draft and revise with AI. It renders the active manuscript as a real EPUB in a panel beside the source. Every edit rebuilds the in-memory preview automatically, so you can inspect the book's pagination, chapter boundaries, image breaks, and reading experience without manually exporting and reopening an EPUB after every change.
 
 While reviewing, you can search the whole book, save bookmarks, highlight passages, and attach revision notes. Highlights and notes are written to a JSON sidecar—a separate review file next to the manuscript. You can give that file to an AI assistant as a precise, source-linked revision brief, then see the revised Markdown re-rendered immediately in the preview.
 
+This is a **review and revision tool**, not an end-to-end publishing system.
+After the human–AI review loop is complete, the author should use a separate,
+project-specific script or CI pipeline to build, validate, and deploy the final
+EPUB.
+
 The preview is powered by [foliate-js](https://github.com/johnfactotum/foliate-js), the same engine used by the Foliate desktop reader, rather than a scrolling HTML approximation. The conversion pipeline is pure JavaScript and requires neither pandoc nor calibre.
 
-## Author and AI workflow
+## Where this tool fits
+
+![Human–AI ebook review loop followed by the author's separate production publishing pipeline](images/human-ai-workflow.png)
+
+### 1. Human–AI review loop — this extension
 
 1. Draft or revise the book with an AI assistant while keeping Markdown as the source of truth.
 2. Open the live EPUB preview beside the Markdown editor.
 3. Read in a representative phone, tablet, e-reader, or desktop layout. Search the manuscript and add bookmarks as you review.
 4. Highlight passages and record revision instructions in context.
 5. Give the manuscript and its `<book>.md.notes.json` sidecar to your AI assistant for the next revision pass.
-6. Review the changes immediately in the live preview, and export an `.epub` only when you need a distributable file.
+6. Review the revised Markdown immediately. Repeat the note-and-revision loop until the author approves it.
 
 The extension does not send your manuscript to an AI provider or revise it automatically. The JSON sidecar is a portable handoff format that you can use with the model and workflow of your choice.
+
+### 2. Production publishing — your separate automation
+
+After approval, run a script or CI workflow maintained by your book project.
+That production pipeline should:
+
+1. Build the final EPUB from the approved Markdown, images, metadata, cover, and production stylesheet.
+2. Run the checks required by the project, such as EPUBCheck, link checks, and device-specific acceptance tests.
+3. Deploy or distribute the approved artifact—for example, upload it to a store, publish it on a website, or copy it to a release directory.
+
+The extension does **not** create or run that production script, manage
+credentials, upload releases, or deploy an ebook. `Export EPUB` is a convenient
+manual export using the extension's renderer; it can be used for inspection or
+as a simple artifact when it meets the project's needs, but it does not replace
+the author's reproducible build-and-deploy pipeline.
 
 ## Features
 
@@ -29,7 +54,8 @@ The extension does not send your manuscript to an AI provider or revise it autom
 - Adjust font size and family, bold text, line height, character and word spacing, margins, alignment, columns, reading mode, and page theme from the `Aa` panel.
 - Search the whole book, save bookmarks, navigate location history, and scrub overall progress.
 - Add highlights and notes without changing the Markdown source. Notes are stored in a JSON sidecar beside the manuscript.
-- Export a standards-based `.epub` beside the Markdown file.
+- Export a standards-based `.epub` beside the Markdown file for inspection or
+  simple manual distribution.
 - Follow the VS Code display language. English is the fallback; Traditional Chinese is also included.
 
 ## Non-goals
@@ -37,6 +63,8 @@ The extension does not send your manuscript to an AI provider or revise it autom
 - Kindle KF8 or MOBI conversion
 - Editing an existing `.epub`
 - Full EPUB validation; use EPUBCheck for release validation
+- Creating or running a project-specific production build/deploy script
+- Publishing to ebook stores, websites, or other distribution services
 - Brightness controls, page-curl animation, dictionary or translation tools, read-aloud, line guides, or reading statistics
 
 ## Installation
@@ -158,7 +186,7 @@ Choose `Fit current panel` in the device menu when you explicitly want paginatio
 
 The preview and exported EPUB follow the same documented compatibility profile: safe CommonMark, all four user-visible GFM extensions, and author-friendly corrections for frequent human/AI drafting mistakes. See the normative [Markdown Compatibility Specification](docs/markdown-compatibility.md) for the complete 27-family matrix, examples, HTML policy, and explicit non-goals.
 
-Raw HTML such as `<img>` or `<a href="…">` is escaped rather than executed, and the escaped source does not create Markdown links or images. Use Markdown images (`![alt](path)`) and links (`[label](url)`). `<href>` is not a valid tag. The renderer accepts `##Heading` as `## Heading` and padded strong markers; these corrections never run inside inline, indented, or fenced code and do not change source line counts.
+Raw HTML such as `<img>` or `<a href="…">` is escaped rather than executed. Use Markdown images (`![alt](path)`) and links (`[label](url)`). `<href>` is not a valid tag. The renderer accepts `##Heading` as `## Heading` and padded strong markers; these corrections never run inside inline, indented, or fenced code and do not change source line counts. Reference definitions remain available across generated chapter boundaries.
 
 ## Device viewport
 
@@ -232,9 +260,9 @@ cover: cover.jpg
 # Chapter One
 ```
 
-Frontmatter is recognized only when the file starts with a nonempty YAML mapping between `---` fences. An empty fence or invalid YAML is rendered as ordinary Markdown, so a thematic break at the start of a manuscript stays a thematic break.
-
-Link and image reference definitions are document-wide, including references used in a later EPUB chapter.
+Frontmatter must be a leading, non-empty YAML mapping. Empty, invalid, or
+non-mapping `---` candidates remain Markdown content, preserving ordinary
+leading thematic breaks.
 
 ### Images
 

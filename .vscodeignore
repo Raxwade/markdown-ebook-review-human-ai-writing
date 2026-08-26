@@ -23,3 +23,6 @@ AGENTS.md
 *.png
 *.jpg
 !images/extension-icon.png
+!images/human-ai-workflow.png
+images/ai-agent-icon.png
+images/human-ai-workflow.svg
