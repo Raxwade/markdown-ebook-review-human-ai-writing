@@ -10,6 +10,7 @@ export const globalValues = new Map<string, unknown>()
 export const globalUpdates: { key: string; value: unknown }[] = []
 export const warningResponses: Array<string | undefined> = []
 export const saveDialogResponses: Array<string | undefined> = []
+export const saveDialogOptions: unknown[] = []
 export let lastPanel: any = null
 export const env = { language: 'en' }
 
@@ -27,6 +28,7 @@ export function reset(): void {
     globalUpdates.length = 0
     warningResponses.length = 0
     saveDialogResponses.length = 0
+    saveDialogOptions.length = 0
     lastPanel = null
     settings.clear()
     settingScopes.clear()
@@ -106,7 +108,8 @@ export const window = {
         return Promise.resolve(warningResponses.shift())
     },
     showInformationMessage: (text: string) => { messages.push({ kind: 'info', text }); return Promise.resolve(undefined) },
-    showSaveDialog: (_options: unknown) => {
+    showSaveDialog: (options: unknown) => {
+        saveDialogOptions.push(options)
         const response = saveDialogResponses.shift()
         return Promise.resolve(response ? Uri.file(response) : undefined)
     },

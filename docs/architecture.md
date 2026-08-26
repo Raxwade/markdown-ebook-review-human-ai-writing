@@ -394,7 +394,7 @@ Notes are stored in `<book>.md.notes.json` beside the manuscript. Deleting the f
 
 Long selections are abbreviated in storage: when a quote exceeds 120 characters, the first and last 45 characters are kept along with `quoteLength`. This avoids copying large portions of the manuscript into the review file while retaining enough text for re-anchoring.
 
-Removing a stale note crosses a filesystem boundary and therefore belongs to the extension host, not the webview. The host revalidates that the requested note is still stale, then presents Archive, Discard, and Cancel. Archive opens a Save dialog at `<markdown-name>_closed_notes.<YYYY-MM-DD-HH-mm>.json` by default and writes `{version, source, closedAt, reason: "source-target-not-found", notes}` before changing the active sidecar. A failed or cancelled archive leaves the note untouched. The drawer can submit all stale IDs for the same bulk workflow.
+Removing a stale note crosses a filesystem boundary and therefore belongs to the extension host, not the webview. Each stale row offers Archive and Delete: Archive opens a Save dialog, while Delete discards the row immediately. The host revalidates that the requested note is still stale in either case. Archive defaults to the most recently modified `<markdown-name>_closed_notes.*.json` beside the manuscript, or creates `<markdown-name>_closed_notes.<YYYY-MM-DD-HH-mm>.json` when none exists. It appends notes to a compatible archive before changing the active sidecar; a failed or cancelled archive leaves the note untouched. The bulk control retains its Archive, Discard, and Cancel workflow for all stale notes.
 
 ### 10.3 Navigate from the note list
 

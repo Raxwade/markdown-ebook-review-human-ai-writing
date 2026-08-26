@@ -15,6 +15,7 @@ const EN_MESSAGES = {
     'common.save': 'Save',
     'common.delete': 'Delete',
     'common.edit': 'Edit',
+    'common.archive': 'Archive',
     'toolbar.historyBack': 'Go back (Alt+Left)',
     'toolbar.historyForward': 'Go forward (Alt+Right)',
     'toolbar.previousPage': 'Previous page (Left / PageUp)',
@@ -129,6 +130,7 @@ const ZH_TW_MESSAGES = {
     'common.save': '儲存',
     'common.delete': '刪除',
     'common.edit': '編輯',
+    'common.archive': '封存',
     'toolbar.historyBack': '返回上一個閱讀位置（Alt+←）',
     'toolbar.historyForward': '前往下一個閱讀位置（Alt+→）',
     'toolbar.previousPage': '上一頁（← / PageUp）',
@@ -1818,7 +1820,7 @@ el.editorSave.addEventListener('click', () => {
 function deleteNote(id) {
     const note = notes.find(item => item.id === id)
     if (note?.status === 'stale') {
-        vscode.postMessage({ type: 'notes:close-stale', ids: [id] })
+        vscode.postMessage({ type: 'notes:discard-stale', ids: [id] })
         return
     }
     // Nothing on screen is that note any more, so nothing should read as selected.
@@ -2225,10 +2227,19 @@ function renderNoteList() {
         const edit = document.createElement('button')
         edit.textContent = t('common.edit')
         edit.addEventListener('click', ev => { ev.stopPropagation(); openEditor(note) })
+        if (note.status === 'stale') {
+            const archive = document.createElement('button')
+            archive.textContent = t('common.archive')
+            archive.addEventListener('click', ev => {
+                ev.stopPropagation()
+                vscode.postMessage({ type: 'notes:archive-stale', ids: [note.id] })
+            })
+            actions.append(edit, archive)
+        } else actions.append(edit)
         const del = document.createElement('button')
         del.textContent = t('common.delete')
         del.addEventListener('click', ev => { ev.stopPropagation(); deleteNote(note.id) })
-        actions.append(edit, del)
+        actions.append(del)
         item.append(actions)
 
         item.addEventListener('click', () => { void activateNote(note) })

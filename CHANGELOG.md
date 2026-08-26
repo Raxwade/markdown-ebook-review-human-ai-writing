@@ -6,11 +6,23 @@ Notable project changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Add an Archive action to each stale note, with the newest matching
+  closed-notes JSON file preselected and later stale notes appended to it.
+
 ### Changed
 
 - Clarify the boundary between the extension's human–AI review loop and the
   author's separate production build, validation, and deployment pipeline, with
   a new workflow diagram in the README.
+- Make the stale-note Delete action discard immediately instead of opening the
+  archive/discard choice.
+
+### Fixed
+
+- Keep the bulk stale-note action in its own Notes-panel row so it cannot
+  overlap the first note.
 
 ## [0.6.3] - 2026-08-25
 

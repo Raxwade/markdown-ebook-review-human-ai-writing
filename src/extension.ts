@@ -226,19 +226,65 @@ export function closedNotesPathFor(docPath: string, at = new Date()): string {
     return path.join(path.dirname(docPath), `${manuscript}_closed_notes.${stamp}.json`)
 }
 
-/** Write stale notes to the user-selected archive before removing them. */
+/**
+ * Find the newest archive for this manuscript. Only extension-created archive
+ * names qualify, so an unrelated JSON file beside the manuscript is never
+ * offered as the default destination.
+ */
+export function latestClosedNotesPathFor(docPath: string): string | undefined {
+    const extension = path.extname(docPath)
+    const manuscript = path.basename(docPath, extension)
+    const pattern = new RegExp(`^${escapeRegExp(manuscript)}_closed_notes\\..+\\.json$`)
+    try {
+        return fs.readdirSync(path.dirname(docPath), { withFileTypes: true })
+            .filter(entry => entry.isFile() && pattern.test(entry.name))
+            .map(entry => {
+                const candidate = path.join(path.dirname(docPath), entry.name)
+                return { candidate, modified: fs.statSync(candidate).mtimeMs }
+            })
+            .sort((a, b) => b.modified - a.modified || b.candidate.localeCompare(a.candidate))[0]?.candidate
+    } catch {
+        return undefined
+    }
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Create or append to a closed-notes archive. Existing archives must be valid
+ * archives for this manuscript; refusing to overwrite another JSON file keeps
+ * a custom destination from silently losing its contents.
+ */
 export function writeClosedNotes(
     docPath: string,
     targetPath: string,
     notes: Note[],
     closedAt = new Date().toISOString(),
 ): void {
+    let existing: Note[] = []
+    if (fs.existsSync(targetPath)) {
+        const text = fs.readFileSync(targetPath, 'utf8')
+        const raw: unknown = JSON.parse(text)
+        if (!raw || typeof raw !== 'object') throw new Error('Existing archive is not a JSON object.')
+        const archive = raw as Record<string, unknown>
+        if (
+            archive.version !== 1
+            || archive.source !== path.basename(docPath)
+            || archive.reason !== 'source-target-not-found'
+            || !Array.isArray(archive.notes)
+        ) throw new Error('Existing file is not a compatible closed-notes archive for this manuscript.')
+        const parsed = parseNotes(text, path.basename(docPath), currentLocale())
+        if (parsed.warnings.length) throw new Error('Existing archive has invalid notes and was not changed.')
+        existing = parsed.file.notes
+    }
     fs.writeFileSync(targetPath, serializeClosedNotes({
         version: 1,
         source: path.basename(docPath),
         closedAt,
         reason: 'source-target-not-found',
-        notes,
+        notes: [...existing, ...notes],
     }), 'utf8')
 }
 
@@ -348,6 +394,7 @@ export function activate(context: vscode.ExtensionContext): void {
         readNotes,
         writeNotes,
         closedNotesPathFor,
+        latestClosedNotesPathFor,
         writeClosedNotes,
         readerStore: new ReaderStateStore(context.globalState),
     }

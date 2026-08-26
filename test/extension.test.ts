@@ -347,7 +347,7 @@ test('removing the last note removes the sidecar rather than leaving a husk', ()
     fs.rmSync(dir, { recursive: true, force: true })
 })
 
-test('closed-note archives use the requested default name and preserve records', () => {
+test('closed-note archives append records and prefer the latest matching archive', () => {
     const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-closed-'))
     const mdPath = path.join(dir, 'my-book.md')
     const at = new Date(2026, 7, 23, 14, 5)
@@ -365,10 +365,19 @@ test('closed-note archives use the requested default name and preserve records',
     assert.equal(archive.closedAt, '2026-08-23T06:05:00.000Z')
     assert.equal(archive.reason, 'source-target-not-found')
     assert.deepEqual(archive.notes, [note])
+
+    const later = path.join(dir, 'my-book_closed_notes.2026-08-24-09-30.json')
+    extension.writeClosedNotes(mdPath, later, [note], '2026-08-24T01:30:00.000Z')
+    const second = { ...note, id: 'stale-2', quote: 'another old text' }
+    extension.writeClosedNotes(mdPath, later, [second], '2026-08-24T02:30:00.000Z')
+    const appended = JSON.parse(fs.readFileSync(later, 'utf8'))
+    assert.deepEqual(appended.notes.map((item: { id: string }) => item.id), ['stale-1', 'stale-2'])
+    assert.equal(appended.closedAt, '2026-08-24T02:30:00.000Z')
+    assert.equal(extension.latestClosedNotesPathFor(mdPath), later)
     fs.rmSync(dir, { recursive: true, force: true })
 })
 
-test('discarding a stale note requires the host dialog and removes it without an archive', async () => {
+test('discarding a stale note removes it immediately without an archive prompt', async () => {
     activate()
     const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-stale-'))
     const mdPath = path.join(dir, 'book.md')
@@ -386,13 +395,11 @@ test('discarding a stale note requires the host dialog and removes it without an
     stub.setActiveDocument(fakeDoc(body, mdPath))
     stub.commands.executeCommand('mdepub.preview')
     stub.lastPanel.receive({ type: 'ready' })
-    stub.warningResponses.push('Discard')
-    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    stub.lastPanel.receive({ type: 'notes:discard-stale', ids: ['stale-1'] })
     await new Promise(resolve => setImmediate(resolve))
 
     assert.equal(fs.existsSync(extension.notesPathFor(mdPath)), false)
-    assert.ok(stub.messages.some(message =>
-        message.kind === 'warning' && /Remove 1 stale note/.test(message.text)))
+    assert.equal(stub.messages.some(message => message.kind === 'warning'), false)
     assert.equal(fs.readdirSync(dir).some(name => name.includes('_closed_notes.')), false)
     fs.rmSync(dir, { recursive: true, force: true })
 })
@@ -416,15 +423,51 @@ test('archiving a stale note writes the chosen file before removing it', async (
     stub.setActiveDocument(fakeDoc(body, mdPath))
     stub.commands.executeCommand('mdepub.preview')
     stub.lastPanel.receive({ type: 'ready' })
-    stub.warningResponses.push('Archive…')
     stub.saveDialogResponses.push(archivePath)
-    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    stub.lastPanel.receive({ type: 'notes:archive-stale', ids: ['stale-1'] })
     await new Promise(resolve => setImmediate(resolve))
 
     assert.equal(fs.existsSync(extension.notesPathFor(mdPath)), false)
     const archive = JSON.parse(fs.readFileSync(archivePath, 'utf8'))
     assert.deepEqual(archive.notes.map((note: { id: string }) => note.id), ['stale-1'])
     assert.equal(typeof archive.closedAt, 'string')
+    assert.equal(stub.messages.some(message => message.kind === 'warning'), false)
+    fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('archiving defaults to the newest closed-notes file and appends to it', async () => {
+    activate()
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mdepub-archive-default-'))
+    const mdPath = path.join(dir, 'book.md')
+    const archivePath = path.join(dir, 'book_closed_notes.2026-08-23-06-00.json')
+    const body = '# A\n\nreplacement text\n'
+    fs.writeFileSync(mdPath, body)
+    const archived = {
+        id: 'already-closed', color: 'purple' as const, chapter: 'A',
+        range: { startLine: 2, startCol: 0, endLine: 2, endCol: 8 },
+        quote: 'older text', note: 'Already archived.', created: '2026-08-22T05:00:00Z',
+    }
+    extension.writeClosedNotes(mdPath, archivePath, [archived])
+    extension.writeNotes(mdPath, {
+        version: 1,
+        source: 'book.md',
+        notes: [{
+            id: 'stale-1', color: 'green', chapter: 'A',
+            range: { startLine: 2, startCol: 0, endLine: 2, endCol: 8 },
+            quote: 'old text', note: 'Rewrite this.', created: '2026-08-23T05:00:00Z',
+        }],
+    })
+    stub.setActiveDocument(fakeDoc(body, mdPath))
+    stub.commands.executeCommand('mdepub.preview')
+    stub.lastPanel.receive({ type: 'ready' })
+    stub.saveDialogResponses.push(archivePath)
+    stub.lastPanel.receive({ type: 'notes:archive-stale', ids: ['stale-1'] })
+    await new Promise(resolve => setImmediate(resolve))
+
+    const options = stub.saveDialogOptions[0] as { defaultUri: { fsPath: string } }
+    assert.equal(options.defaultUri.fsPath, archivePath)
+    const archive = JSON.parse(fs.readFileSync(archivePath, 'utf8'))
+    assert.deepEqual(archive.notes.map((note: { id: string }) => note.id), ['already-closed', 'stale-1'])
     fs.rmSync(dir, { recursive: true, force: true })
 })
 
@@ -446,9 +489,8 @@ test('a stale-note archive cannot overwrite the manuscript or active sidecar', a
     stub.setActiveDocument(fakeDoc(body, mdPath))
     stub.commands.executeCommand('mdepub.preview')
     stub.lastPanel.receive({ type: 'ready' })
-    stub.warningResponses.push('Archive…')
     stub.saveDialogResponses.push(mdPath)
-    stub.lastPanel.receive({ type: 'notes:close-stale', ids: ['stale-1'] })
+    stub.lastPanel.receive({ type: 'notes:archive-stale', ids: ['stale-1'] })
     await new Promise(resolve => setImmediate(resolve))
 
     assert.equal(fs.readFileSync(mdPath, 'utf8'), body)

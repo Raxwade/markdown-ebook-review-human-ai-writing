@@ -25,6 +25,7 @@ interface Host {
     readNotes(docPath: string): { file: NotesFile; warnings: string[] }
     writeNotes(docPath: string, file: NotesFile): void
     closedNotesPathFor(docPath: string, at?: Date): string
+    latestClosedNotesPathFor(docPath: string): string | undefined
     writeClosedNotes(docPath: string, targetPath: string, notes: Note[], closedAt?: string): void
     readerStore: ReaderStateStore
 }
@@ -80,6 +81,14 @@ export class Preview {
                 }
                 if (msg?.type === 'notes:close-stale' && Array.isArray(msg.ids)) {
                     void this.closeStaleNotes(msg.ids.filter((id: unknown): id is string => typeof id === 'string'))
+                    return
+                }
+                if (msg?.type === 'notes:archive-stale' && Array.isArray(msg.ids)) {
+                    void this.archiveStaleNotes(msg.ids.filter((id: unknown): id is string => typeof id === 'string'))
+                    return
+                }
+                if (msg?.type === 'notes:discard-stale' && Array.isArray(msg.ids)) {
+                    this.discardStaleNotes(msg.ids.filter((id: unknown): id is string => typeof id === 'string'))
                     return
                 }
                 if (msg?.type === 'reader:profile-save') {
@@ -254,11 +263,7 @@ export class Preview {
      * cancelled save cannot lose review instructions.
      */
     private async closeStaleNotes(ids: string[]): Promise<void> {
-        const requested = new Set(ids)
-        const { file } = this.host.readNotes(this.doc.uri.fsPath)
-        const stale = anchorAll(file.notes, this.doc.getText())
-            .filter(item => item.status === 'stale' && requested.has(item.note.id))
-            .map(item => item.note)
+        const { file, stale } = this.staleNotes(ids)
         if (!stale.length) {
             this.postNotes()
             return
@@ -274,32 +279,69 @@ export class Preview {
             discard,
         )
         if (choice !== archive && choice !== discard) return
+        if (choice === archive && !await this.archive(stale, locale)) return
+        this.removeStaleNotes(file, stale, locale)
+    }
 
-        if (choice === archive) {
-            const target = await vscode.window.showSaveDialog({
-                title: hostText(locale, 'staleArchiveSaveTitle'),
-                defaultUri: vscode.Uri.file(this.host.closedNotesPathFor(this.doc.uri.fsPath)),
-                saveLabel: archive,
-                filters: { JSON: ['json'] },
-            })
-            if (!target) return
-            const resolvedTarget = path.resolve(target.fsPath)
-            const manuscript = path.resolve(this.doc.uri.fsPath)
-            const activeNotes = path.resolve(`${this.doc.uri.fsPath}.notes.json`)
-            if (resolvedTarget === manuscript || resolvedTarget === activeNotes) {
-                void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveUnsafePath'))
-                return
-            }
-            try {
-                this.host.writeClosedNotes(this.doc.uri.fsPath, target.fsPath, stale)
-            } catch (err) {
-                void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveFailed', {
-                    error: (err as Error).message,
-                }))
-                return
-            }
+    /** Archive selected stale notes without an intermediate archive/discard prompt. */
+    private async archiveStaleNotes(ids: string[]): Promise<void> {
+        const { file, stale } = this.staleNotes(ids)
+        if (!stale.length) {
+            this.postNotes()
+            return
         }
+        const locale = currentLocale()
+        if (await this.archive(stale, locale)) this.removeStaleNotes(file, stale, locale)
+    }
 
+    /** Discard selected stale notes immediately; this is the explicit Delete action. */
+    private discardStaleNotes(ids: string[]): void {
+        const { file, stale } = this.staleNotes(ids)
+        if (!stale.length) {
+            this.postNotes()
+            return
+        }
+        this.removeStaleNotes(file, stale, currentLocale())
+    }
+
+    private staleNotes(ids: string[]): { file: NotesFile; stale: Note[] } {
+        const requested = new Set(ids)
+        const { file } = this.host.readNotes(this.doc.uri.fsPath)
+        const stale = anchorAll(file.notes, this.doc.getText())
+            .filter(item => item.status === 'stale' && requested.has(item.note.id))
+            .map(item => item.note)
+        return { file, stale }
+    }
+
+    private async archive(stale: Note[], locale: ReturnType<typeof currentLocale>): Promise<boolean> {
+        const archive = hostText(locale, 'archiveStale')
+        const previous = this.host.latestClosedNotesPathFor(this.doc.uri.fsPath)
+        const target = await vscode.window.showSaveDialog({
+            title: hostText(locale, 'staleArchiveSaveTitle'),
+            defaultUri: vscode.Uri.file(previous ?? this.host.closedNotesPathFor(this.doc.uri.fsPath)),
+            saveLabel: archive,
+            filters: { JSON: ['json'] },
+        })
+        if (!target) return false
+        const resolvedTarget = path.resolve(target.fsPath)
+        const manuscript = path.resolve(this.doc.uri.fsPath)
+        const activeNotes = path.resolve(`${this.doc.uri.fsPath}.notes.json`)
+        if (resolvedTarget === manuscript || resolvedTarget === activeNotes) {
+            void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveUnsafePath'))
+            return false
+        }
+        try {
+            this.host.writeClosedNotes(this.doc.uri.fsPath, target.fsPath, stale)
+            return true
+        } catch (err) {
+            void vscode.window.showErrorMessage(hostText(locale, 'staleArchiveFailed', {
+                error: (err as Error).message,
+            }))
+            return false
+        }
+    }
+
+    private removeStaleNotes(file: NotesFile, stale: Note[], locale: ReturnType<typeof currentLocale>): void {
         const closed = new Set(stale.map(note => note.id))
         try {
             this.host.writeNotes(this.doc.uri.fsPath, {
