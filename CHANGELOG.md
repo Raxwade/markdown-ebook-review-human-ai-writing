@@ -23,6 +23,9 @@ Notable project changes are recorded here. The format follows
 
 - Keep the bulk stale-note action in its own Notes-panel row so it cannot
   overlap the first note.
+- Package README media links against the `main` branch instead of the remote's
+  ambiguous `HEAD` reference, so extension-details media resolves after the
+  branch is published.
 
 ## [0.6.3] - 2026-08-25
 

@@ -2,7 +2,13 @@
 
 [![CI](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml/badge.svg)](https://github.com/Raxwade/markdown-ebook-review-human-ai-writing/actions/workflows/ci.yml)
 
-![Edit Markdown and see the real EPUB preview update while the reading position is preserved](images/demos/live-preview.gif)
+## Edit, then review the same place
+
+Edit a sentence in the Markdown pane on the left. The real EPUB reader on the
+right rebuilds at the same reading location, keeping the highlighted passage in
+view.
+
+![A Markdown source edit becomes an updated paragraph in the real EPUB reader while the highlighted passage stays in view](images/demos/live-preview.gif)
 
 Review a Markdown manuscript as a real EPUB without leaving VS Code. Edit the
 source, inspect the result in an ebook reader, and leave precise revision notes

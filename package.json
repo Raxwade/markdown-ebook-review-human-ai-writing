@@ -174,7 +174,7 @@
     "spike:notes": "node spike/notes-loop.mjs",
     "spike:reader": "node spike/reader-experience-loop.mjs",
     "spike": "npm run spike:fixture && npm run bundle:stage && node spike/server.mjs",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies --githubBranch main"
   },
   "dependencies": {
     "fflate": "^0.8.3",
