@@ -26,6 +26,8 @@ Notable project changes are recorded here. The format follows
 - Package README media links against the `main` branch instead of the remote's
   ambiguous `HEAD` reference, so extension-details media resolves after the
   branch is published.
+- Keep repository documentation out of the VSIX so the package-content check
+  matches the shipped runtime assets.
 
 ## [0.6.3] - 2026-08-25
 

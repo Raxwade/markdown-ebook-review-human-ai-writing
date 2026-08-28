@@ -1,4 +1,4 @@
-# Source is bundled into dist/extension.js; ship only user-facing documentation.
+# Source and repository documentation stay outside the runtime VSIX.
 .vscode/**
 .github/**
 .claude/**
@@ -9,7 +9,6 @@ src/**
 test/**
 spike/**
 docs/**
-!docs/markdown-compatibility.md
 .playwright-mcp/**
 **/*.ts
 **/*.map
