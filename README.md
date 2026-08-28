@@ -75,8 +75,11 @@ modifying the manuscript.
 ## Quick start
 
 1. Open any Markdown file in VS Code.
-2. Run **Markdown Ebook Review: Open EPUB Preview** from the Command Palette,
-   or select the book icon in the editor title bar.
+2. Select the book icon in the editor title bar to open EPUB Preview. You can
+   also run **Markdown Ebook Review: Open EPUB Preview** from the Command
+   Palette.
+
+   ![Click the book icon in a Markdown editor to open EPUB Preview beside the source](images/demos/quick-start.gif)
 3. Read, search, bookmark, and add notes. For an AI revision pass, provide the
    Markdown file together with its `<book>.md.notes.json` sidecar.
 
